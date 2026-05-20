@@ -156,18 +156,26 @@ export const mimo: Provider = {
     //   - parallel_tool_calls: true        ← batch tool calls per turn
     //   - web_search forwarded to MiMo     ← model decides when to search
     //
-    // Token-plan accounts don't have the Web Search Plugin, so we proactively
-    // strip web_search before forwarding (avoids 400 "webSearchEnabled is false").
+    // Token-plan accounts don't have the Web Search Plugin by default, so we
+    // proactively strip web_search before forwarding (avoids 400). Users who
+    // have activated the plugin can override this with MIMO2CODEX_WEB_SEARCH=1.
+    const forceWs = process.env.MIMO2CODEX_WEB_SEARCH;
+    const webSearchExplicit =
+      forceWs === "1" || forceWs === "true"
+        ? true
+        : forceWs === "0" || forceWs === "false"
+          ? false
+          : undefined;
+    const enableWebSearch = webSearchExplicit ?? !ctx.runtime.flags.isTokenPlan;
     const chat = reqToChat(req, {
       forceParallelToolCalls: true,
-      enableWebSearch: !ctx.runtime.flags.isTokenPlan,
+      enableWebSearch,
       imageDropDir: ctx.dataDir,
       disableThinking: ctx.disableThinking,
       forceHighEffort: ctx.forceHighEffort,
     });
     return normalizeMimoBody(chat, req.model);
   },
-
   preprocessChat(req: ChatRequest, ctx: PreprocessCtx): ChatRequest {
     // Chat passthrough: forward verbatim. MiMo is itself Chat-Completions-native.
     const out = { ...req };

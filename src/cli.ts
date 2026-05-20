@@ -119,8 +119,8 @@ DEFAULTS BAKED IN (no flag needed)
         doesn't have the Web Search Plugin activated, MiMo returns 400
         "webSearchEnabled is false" — mimo2codex surfaces that error so you can
         activate the plugin (https://platform.xiaomimimo.com/#/console/plugin,
-        separately billed) and restart, or accept that web search isn't available
-
+        separately billed) and restart, or accept that web search isn't available.
+        Token-plan users who activated the plugin can set MIMO2CODEX_WEB_SEARCH=1.
 SUBCOMMANDS
   init                    bootstrap <data-dir>/.env + .env.example from the bundled
                           template. Idempotent: refreshes .env.example, only creates
@@ -367,7 +367,7 @@ function printStartupBanner(
   }
   if (cfg.defaultProviderId === "mimo") {
     lines.push(
-      `plan:        ${cfg.isTokenPlan ? "token-plan (web_search auto-disabled — plugin not available)" : "pay-as-you-go"}`
+      `plan:        ${cfg.isTokenPlan ? "token-plan (web_search auto-disabled; set MIMO2CODEX_WEB_SEARCH=1 if plugin activated)" : "pay-as-you-go"}`
     );
   }
   lines.push(`reasoning:   ${cfg.exposeReasoning ? "passthrough" : "hidden"}`);

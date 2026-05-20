@@ -302,7 +302,7 @@ Full field reference, `wireApi: "responses"` passthrough mode, copy-pasteable ex
 mimo2codex applies two behaviors automatically to make MiMo behave more like the OpenAI / Anthropic models Codex was designed for:
 
 - **`parallel_tool_calls` forced on** — overrides Codex's default of `false`. Lets MiMo batch multiple tool calls per turn → fewer round-trips before the model commits to `apply_patch`.
-- **Web search auto-forwarded with auto-fallback** — Codex's `web_search`/`web_search_preview` is translated to MiMo's `web_search` builtin. The model decides when to invoke it (no extra prompting required). If your account doesn't have the Web Search Plugin activated, the first request returns a 400; mimo2codex catches it, strips `web_search`, retries, and remembers — subsequent requests in the same process skip web_search proactively. **Zero config either way.**
+- **Web search auto-forwarded with auto-fallback** — Codex's `web_search`/`web_search_preview` is translated to MiMo's `web_search` builtin. The model decides when to invoke it (no extra prompting required). If your account doesn't have the Web Search Plugin activated, the first request returns a 400; mimo2codex catches it, strips `web_search`, retries, and remembers — subsequent requests in the same process skip web_search proactively. **Zero config either way.** Token-plan (`tp-*`) accounts auto-skip web search by default; set `MIMO2CODEX_WEB_SEARCH=1` after activating the plugin to override.
 
 > **Thinking mode is ON** — MiMo generates `reasoning_content` on every request and Codex shows it in the terminal. Pass `--no-reasoning` to hide thinking from the terminal (mimo2codex still re-injects it across turns for multi-turn tool quality, per [MiMo's official recommendation](https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call)).
 
@@ -388,7 +388,7 @@ You're on an old build. Newer mimo2codex catches this 400 automatically: it stri
 
 If you actually want web search to work upstream, activate the Web Search Plugin at [MiMo console → Plugin Management](https://platform.xiaomimimo.com/#/console/plugin) (separately billed), then restart mimo2codex.
 
-</details>
+**Token-plan (`tp-*`) users:** mimo2codex auto-disables web search for token-plan accounts by default. After activating the plugin, set `MIMO2CODEX_WEB_SEARCH=1` (env var or in your `.env`) to override this and enable web search.</details>
 
 <details>
 <summary><b>Startup banner shows ⚠ "sk-* key needs the pay-as-you-go host..." / "tp-* key needs the token-plan host..."</b></summary>
