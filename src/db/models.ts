@@ -128,3 +128,47 @@ export function deleteModel(id: number): boolean {
   return info.changes > 0;
 }
 
+
+// ── Model aliases ──────────────────────────────────────────────────────
+
+export interface ModelAliasRow {
+  alias: string;
+  provider_id: string;
+  upstream_id: string;
+}
+
+export function getModelAlias(alias: string): ModelAliasRow | null {
+  return (
+    (getDb().prepare("SELECT * FROM model_aliases WHERE alias = ?").get(alias) as
+      | ModelAliasRow
+      | undefined) ?? null
+  );
+}
+
+export function listModelAliases(providerId?: ProviderId): ModelAliasRow[] {
+  if (providerId) {
+    return getDb()
+      .prepare("SELECT * FROM model_aliases WHERE provider_id = ? ORDER BY alias")
+      .all(providerId) as ModelAliasRow[];
+  }
+  return getDb()
+    .prepare("SELECT * FROM model_aliases ORDER BY provider_id, alias")
+    .all() as ModelAliasRow[];
+}
+
+export function upsertModelAlias(alias: string, providerId: ProviderId, upstreamId: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO model_aliases (alias, provider_id, upstream_id)
+       VALUES (@alias, @provider_id, @upstream_id)
+       ON CONFLICT(alias) DO UPDATE SET
+         provider_id = excluded.provider_id,
+         upstream_id = excluded.upstream_id`
+    )
+    .run({ alias, provider_id: providerId, upstream_id: upstreamId });
+}
+
+export function deleteModelAlias(alias: string): boolean {
+  const info = getDb().prepare("DELETE FROM model_aliases WHERE alias = ?").run(alias);
+  return info.changes > 0;
+}

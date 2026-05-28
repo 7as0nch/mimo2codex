@@ -319,6 +319,30 @@ export function selectProvider(
     };
   }
 
+  // Check model_aliases table before falling back to default provider.
+  // This allows users to map unknown client models (e.g. "gpt-5.4") to
+  // a specific provider/model without triggering the rewrite warning.
+  try {
+    const { getModelAlias } = await import("./db/models.js");
+    const alias = getModelAlias(clientModel);
+    if (alias) {
+      const p = PROVIDERS[alias.provider_id as keyof typeof PROVIDERS];
+      const rt = p ? cfg.providers[p.id] : null;
+      if (p && rt) {
+        const resolved = p.resolveModel(alias.upstream_id);
+        return {
+          provider: p,
+          runtime: rt,
+          upstreamModel: resolved?.id ?? alias.upstream_id,
+          modelInfo: resolved ?? p.resolveModel(p.defaultModel),
+          rewriteNotice: null, // Alias matched — no rewrite warning
+        };
+      }
+    }
+  } catch {
+    // DB not available or table missing — continue with normal fallback
+  }
+
   // No provider with a key matches → fall back to the default provider.
   const provider = PROVIDERS[cfg.defaultProviderId];
   const runtime = cfg.providers[cfg.defaultProviderId];

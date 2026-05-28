@@ -21,6 +21,9 @@ import {
   insertCustomModel,
   listModels,
   patchModel,
+  listModelAliases,
+  upsertModelAlias,
+  deleteModelAlias,
 } from "../db/models.js";
 import {
   deleteSetting,
@@ -1076,6 +1079,35 @@ async function handleApi(ctx: RouteContext): Promise<void> {
       }
     }
     return sendError(res, 405, "method_not_allowed", "use PATCH or DELETE");
+  }
+
+  // /admin/api/aliases
+  if (pathname === "/admin/api/aliases") {
+    if (req.method === "GET") {
+      const provider = query.get("provider") ?? undefined;
+      return sendJson(res, 200, { aliases: listModelAliases(provider) });
+    }
+    if (req.method === "POST") {
+      const body = await readJsonBody<{ alias?: string; providerId?: string; upstreamId?: string }>(req);
+      if (!body.alias || !body.providerId || !body.upstreamId) {
+        return sendError(res, 400, "missing_fields", "alias, providerId, and upstreamId required");
+      }
+      upsertModelAlias(body.alias, body.providerId, body.upstreamId);
+      return sendJson(res, 201, { alias: body.alias, providerId: body.providerId, upstreamId: body.upstreamId });
+    }
+    return sendError(res, 405, "method_not_allowed", "use GET or POST");
+  }
+
+  // /admin/api/aliases/:alias
+  const aliasMatch = pathname.match(/^\/admin\/api\/aliases\/(.+)$/);
+  if (aliasMatch) {
+    const alias = decodeURIComponent(aliasMatch[1]);
+    if (req.method === "DELETE") {
+      const ok = deleteModelAlias(alias);
+      if (!ok) return sendError(res, 404, "not_found", `alias "${alias}" not found`);
+      return sendJson(res, 200, { deleted: true });
+    }
+    return sendError(res, 405, "method_not_allowed", "use DELETE");
   }
 
   if (req.method === "GET" && pathname === "/admin/api/logs") {
