@@ -282,22 +282,22 @@ function AppFooter() {
           </span>
         )}{" "}
         · © {year} ·{" "}
-        <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noreferrer">
+        <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noreferrer noopener">
           {t("footer.license")}
         </a>
         <span style={{ marginLeft: 12 }}>
-          <a href={GITHUB_REPO} target="_blank" rel="noreferrer">
+          <a href={GITHUB_REPO} target="_blank" rel="noreferrer noopener">
             GitHub
           </a>
           {" · "}
-          <a href={`${GITHUB_REPO}/issues`} target="_blank" rel="noreferrer">
+          <a href={`${GITHUB_REPO}/issues`} target="_blank" rel="noreferrer noopener">
             {t("footer.feedback")}
           </a>
           {" · "}
           <a
             href="https://mimodoc.chengj.online/"
             target="_blank"
-            rel="noreferrer"
+            rel="noreferrer noopener"
             title={t("footer.docsTooltip")}
             style={{ fontWeight: 500 }}
           >
