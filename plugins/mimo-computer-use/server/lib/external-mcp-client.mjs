@@ -21,7 +21,7 @@ export async function callExternalMcp(command, args, toolName, toolArgs, opts = 
 
   // spawn() emits 'error' asynchronously when the command can't be launched
   // (ENOENT / EACCES — commandExists() narrows but can't eliminate the race,
-  // and indirect launchers like `uvx windows-mcp serve` can still fail). With
+  // and indirect launchers can still fail). With
   // no listener Node throws it as an uncaught exception, killing the whole
   // mimo-computer-use server. Reject every pending request instead so the
   // caller degrades to { ok: false } and we don't wait out the timeout.

@@ -2,7 +2,7 @@
 
 `mimo-computer-use` 是 mimo2codex 自带的本地 Codex MCP 插件，用来让 MiMo、
 DeepSeek 以及其它兼容 OpenAI function calling 的模型，通过 Codex 的本地工具
-机制控制 Windows / macOS 桌面。
+机制控制桌面（macOS / Windows，统一走 Trope CUA 后端）。
 
 它不是 OpenAI 服务端 `computer_use_preview` 协议，也不会改变 mimo2codex 的
 Responses API 到 Chat Completions 翻译逻辑。它只是新增一个本地 MCP server，
@@ -66,11 +66,18 @@ Admin UI 开关可热更新。
 ## 首次 adapter 检测与安装
 
 插件目录会随 npm 包、桌面端 sidecar、Docker 镜像一起分发；但真正控制桌面的
-底层 adapter 来自第三方项目：
+底层 adapter 来自第三方项目——统一使用后端
+[Trope CUA](https://github.com/voctory/trope-cua)（**仅 macOS 与 Windows**），
+它是默认后端，`MIMO_COMPUTER_USE_BACKEND` 可以不设（`auto`）或显式设为 `trope`。
 
-- macOS：Peekaboo
-- Windows：Windows-MCP
-- Trope CUA：预留 experimental shared adapter
+Trope CUA 以**源码**分发。`npm run install-adapter` 会自动把仓库 `git clone` 到
+`~/.mimo2codex/adapters/trope-cua`，再运行对应平台的构建脚本。先决条件：
+
+- 通用：`git`
+- macOS 14+：Xcode Command Line Tools；构建脚本 `scripts/install-macos.sh`；
+  装完到系统设置授予 TropeCUA.app 的 Accessibility 与 Screen Recording 权限。
+- Windows 10 1903+/11：PowerShell + 与 `global.json` 匹配的 .NET SDK；
+  构建脚本 `scripts\install-windows.ps1 -SelfContained`。
 
 检测：
 
@@ -79,19 +86,18 @@ cd plugins/mimo-computer-use
 npm run doctor
 ```
 
-安装：
+安装（自动 clone + 构建）：
 
 ```bash
 npm run install-adapter
 ```
 
-安装器行为：
+装完用 `trope-cua --help` / `trope-cua check_permissions` 自检。可执行文件名或
+启动参数不同时，可用 `MIMO_COMPUTER_USE_TROPE_CMD` /
+`MIMO_COMPUTER_USE_TROPE_ARGS` 覆盖。
 
-- macOS：执行 `brew install steipete/tap/peekaboo`。安装完成后仍需在系统设置中授予 Screen Recording 和 Accessibility。
-- Windows：优先执行 `uv tool install windows-mcp`。如果只有 `uvx`，会解析 / 缓存 Windows-MCP，并在运行时使用 `uvx windows-mcp serve`。
-- Linux：第一版不支持。
-
-模型也可以调用 MCP 工具 `computer_install_adapter`。工具要求模型先向用户说明会下载哪个第三方 adapter，再带 `confirm_install=true` 调用。
+模型也可以调用 MCP 工具 `computer_install_adapter`。工具要求模型先向用户说明会下载
+哪个第三方 adapter，再带 `confirm_install=true` 调用。
 
 ## mimoskill 集成
 
@@ -105,7 +111,7 @@ python3 mimoskill/scripts/computer_use_setup.py --install
 当用户要求 MiMo / Codex 操作电脑时，`mimoskill` 的流程是：
 
 1. 先运行 `computer_use_setup.py` 检测插件和 adapter。
-2. 如果返回 `adapter_missing`，说明将安装 Peekaboo 或 Windows-MCP。
+2. 如果返回 `adapter_missing`，说明将安装 Trope CUA。
 3. 运行 `computer_use_setup.py --install`，把安装进度回显给用户。
 4. 安装完成后继续调用 `computer_state`，再小步点击 / 输入 / 滚动。
 
@@ -121,8 +127,8 @@ Codex CLI / Desktop 中加载插件。
 
 ## 故障排查
 
-- `adapter_missing`：运行 `npm run install-adapter`。
-- macOS 权限错误：重新授予 Screen Recording / Accessibility，并重启 Codex。
-- Windows 找不到命令：确认 `windows-mcp`、`uv` 或 `uvx` 在 PATH 中；安装后重启终端 / Codex。
+- `adapter_missing`：运行 `npm run install-adapter`，或参考 https://github.com/voctory/trope-cua 手动安装。
+- 找不到命令：确认 `trope-cua` 在 PATH 中（或用 `MIMO_COMPUTER_USE_TROPE_CMD` 指向完整路径）；安装后重启终端 / Codex。
+- 系统权限错误：按 Trope CUA 文档授予对应的辅助功能 / 屏幕录制权限，并重启 Codex。
 - Codex 看不到工具：确认 Admin UI 已启用插件、`~/.codex/config.toml` 有 `[mcp_servers.mimo-computer-use]`，并完全重启 Codex。
 - MiMo / DeepSeek tool output 不兼容图片：这是预期设计。插件返回文本 JSON 和本地截图路径，不直接把图片塞进 tool result。

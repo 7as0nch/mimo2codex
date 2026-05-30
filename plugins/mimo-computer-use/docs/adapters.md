@@ -9,26 +9,18 @@ Adapters normalize platform-specific desktop automation into six MCP tools.
 - Return screenshot paths as strings, never embedded image content.
 - Keep dangerous operations out of the public tool surface.
 
-## Current adapters
+## Current adapter
 
-### macOS: Peekaboo
+### Cross-platform: Trope CUA
 
-The macOS adapter shells out to `peekaboo`. It assumes the user installed the
-Peekaboo CLI and granted Screen Recording / Accessibility permissions.
-
-### Windows: Windows-MCP
-
-The Windows adapter launches a Windows-MCP stdio MCP server and forwards calls
-to its desktop tools. The default command can be overridden with
-`MIMO_COMPUTER_USE_WINDOWS_MCP_CMD`.
-
-### Shared: Trope CUA
-
-The Trope adapter is opt-in via `MIMO_COMPUTER_USE_BACKEND=trope`. It launches a
-Trope CUA MCP server and forwards calls to common tool names.
+The single backend launches a [Trope CUA](https://github.com/voctory/trope-cua)
+stdio MCP server (via `callExternalMcp`) and forwards the six computer-use tools
+to it. It is the default on every platform; `MIMO_COMPUTER_USE_BACKEND` accepts
+`auto` (default) or `trope`. The launch command/args are overridable with
+`MIMO_COMPUTER_USE_TROPE_CMD` / `MIMO_COMPUTER_USE_TROPE_ARGS`.
 
 ## Future work
 
-- Add backend-specific tool discovery and smarter name/argument mapping.
+- Verify and refine the Trope CUA tool-name / argument mapping against upstream.
 - Add optional OCR pass for screenshot paths using mimo2codex `mimoskill`.
 - Add a small admin/doctor UI for dependency and permission checks.

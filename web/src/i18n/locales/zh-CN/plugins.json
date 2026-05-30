@@ -6,7 +6,7 @@
   "no": "否",
   "notice": {
     "title": "首次使用会先检测 adapter，缺失时可直接安装",
-    "desc": "启用开关会把内置 MCP server 写入 Codex 配置。真正操作桌面前，插件会检测 macOS 的 Peekaboo 或 Windows 的 Windows-MCP；缺失时可运行 npm run install-adapter，或让模型调用 computer_install_adapter 并显示安装进度。"
+    "desc": "启用开关会把内置 MCP server 写入 Codex 配置。真正操作桌面前，插件会检测跨平台后端 Trope CUA；缺失时可运行 npm run install-adapter，或让模型调用 computer_install_adapter 并显示安装进度。"
   },
   "category": {
     "computer-use": "Computer Use"

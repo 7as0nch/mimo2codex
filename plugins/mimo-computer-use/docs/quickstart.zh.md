@@ -45,28 +45,29 @@ MIMO_COMPUTER_USE_BACKEND = "auto"
 
 这不会修改 mimo2codex 的 provider 配置；它只是让 Codex 多启动一个本地 MCP 工具服务。新版 mimo2codex 切模型时会保留 `[mcp_servers.*]` 配置。
 
-## 3. 检测并安装系统 adapter
+## 3. 检测并安装 adapter（Trope CUA）
 
-插件首次使用会先检测第三方 adapter。缺失时会给出清晰诊断；如果你同意安装，
-可以直接运行插件内置安装命令，过程会打印进度。
+mimo-computer-use 使用单一后端
+[Trope CUA](https://github.com/voctory/trope-cua)（**仅 macOS 与 Windows**），
+它是默认后端，`MIMO_COMPUTER_USE_BACKEND` 可以不设（`auto`）或显式设为 `trope`。
 
-macOS：
+Trope CUA 以**源码**分发：`npm run install-adapter` 会自动 `git clone` 仓库到
+`~/.mimo2codex/adapters/trope-cua`，再运行对应平台的构建脚本。先决条件：
+
+- 通用：`git`
+- macOS：Xcode Command Line Tools；装完后到「系统设置 → 隐私与安全性」授予
+  TropeCUA.app 的 Accessibility 与 Screen Recording 权限
+- Windows：PowerShell + 与 `global.json` 匹配的 .NET SDK
+
+检测并安装：
 
 ```bash
 cd <mimo2codex-install-root>/plugins/mimo-computer-use
-npm run doctor
-npm run install-adapter
+npm run doctor            # 检测 trope-cua 是否在 PATH
+npm run install-adapter   # 自动 clone + 构建安装（macOS: install-macos.sh）
 ```
 
-安装器会调用：
-
-```bash
-brew install steipete/tap/peekaboo
-```
-
-安装完成后，仍需要在系统设置里授权 Screen Recording 和 Accessibility。
-
-Windows：
+Windows（PowerShell）同理（构建脚本为 `install-windows.ps1 -SelfContained`）：
 
 ```powershell
 cd <mimo2codex-install-root>\plugins\mimo-computer-use
@@ -74,20 +75,12 @@ npm run doctor
 npm run install-adapter
 ```
 
-安装器优先调用：
+装完后用 `trope-cua --help` / `trope-cua check_permissions` 自检。可执行文件名或
+启动参数不同时，可覆盖：
 
-```powershell
-uv tool install windows-mcp
-```
-
-如果只有 `uvx` 可用，会先解析 / 缓存 Windows-MCP，并在运行时使用
-`uvx windows-mcp serve`。
-
-可选跨平台后端 Trope CUA：
-
-```toml
-[mcp_servers.mimo-computer-use.env]
-MIMO_COMPUTER_USE_BACKEND = "trope"
+```bash
+MIMO_COMPUTER_USE_TROPE_CMD=/path/to/trope-cua
+MIMO_COMPUTER_USE_TROPE_ARGS="mcp"
 ```
 
 ## 4. 本地诊断
@@ -105,7 +98,7 @@ npm run doctor
 {
   "ok": false,
   "code": "adapter_missing",
-  "message": "Peekaboo is not available..."
+  "message": "Trope CUA is not available..."
 }
 ```
 

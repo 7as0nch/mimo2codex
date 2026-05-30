@@ -92,8 +92,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         icon: <CloudDownloadOutlined />,
         title: { en: "First-use adapter install", zh: "首次 adapter 检测与安装" },
         description: {
-          en: "Run npm run doctor / install-adapter, or let the MCP tool install Peekaboo on macOS and Windows-MCP on Windows with visible progress.",
-          zh: "可运行 npm run doctor / install-adapter，也可让 MCP 工具安装 macOS Peekaboo 或 Windows-MCP 并显示进度。",
+          en: "Run npm run doctor / install-adapter (macOS/Windows), or let the MCP tool clone + build the Trope CUA adapter from source with visible progress.",
+          zh: "可运行 npm run doctor / install-adapter（macOS/Windows），也可让 MCP 工具从源码 clone + 构建 Trope CUA adapter 并显示进度。",
         },
       },
       {

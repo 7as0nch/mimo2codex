@@ -31,7 +31,7 @@ export function builtinComputerUsePlugin(): BuiltinPluginInfo {
     id: BUILTIN_COMPUTER_USE_PLUGIN_ID,
     name: "MiMo Computer Use",
     description:
-      "Local MCP computer-use tools for MiMo, DeepSeek, and OpenAI-compatible models via Peekaboo, Windows-MCP, or Trope CUA.",
+      "Local MCP computer-use tools for MiMo, DeepSeek, and OpenAI-compatible models via the cross-platform Trope CUA adapter.",
     category: "computer-use",
     mcpServerName: BUILTIN_COMPUTER_USE_PLUGIN_ID,
     pluginRoot: root,

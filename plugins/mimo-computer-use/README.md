@@ -52,11 +52,10 @@ Then restart Codex Desktop. In a new Codex thread, ask:
 Use mimo-computer-use computer_state to inspect the current desktop.
 ```
 
-The plugin can load even before the platform adapter is installed. In that case
-`computer_state` returns a setup diagnostic, such as "Peekaboo is not available"
-on macOS or "Windows-MCP is not available" on Windows. Agents may then call
-`computer_install_adapter` after explaining the third-party download plan to the
-user.
+The plugin can load even before the Trope CUA adapter is installed. In that case
+`computer_state` returns a setup diagnostic ("Trope CUA is not available"). Agents
+may then call `computer_install_adapter` after explaining the third-party download
+plan to the user.
 
 ## Tools
 
@@ -73,17 +72,17 @@ Tool results are text JSON only. When an adapter produces a screenshot, it shoul
 return a local path in the JSON payload instead of embedding image bytes in the
 tool result. This keeps MiMo and DeepSeek tool-result history compatible.
 
-## Backends
+## Backend
 
-- macOS: [Peekaboo](https://github.com/openclaw/Peekaboo), selected by default
-  on `darwin`.
-- Windows: [Windows-MCP](https://github.com/CursorTouch/Windows-MCP), selected
-  by default on `win32`.
-- Shared/experimental: [Trope CUA](https://trope.ai/cua), selected with
-  `MIMO_COMPUTER_USE_BACKEND=trope`.
+A single backend, [Trope CUA](https://github.com/voctory/trope-cua), on **macOS
+and Windows**. It is the default — `MIMO_COMPUTER_USE_BACKEND` may be left unset
+(`auto`) or set explicitly to `trope`. The command/args are overridable via
+`MIMO_COMPUTER_USE_TROPE_CMD` / `MIMO_COMPUTER_USE_TROPE_ARGS`.
 
-The plugin uses external-install detection only. It does not download or vendor
-these projects.
+Trope CUA is distributed as source: `npm run install-adapter` clones the repo and
+runs its platform build script (`install-macos.sh` / `install-windows.ps1
+-SelfContained`). Requires `git` plus Xcode Command Line Tools (macOS) or the .NET
+SDK (Windows). The plugin does not vendor Trope CUA.
 
 ## Diagnose and install
 

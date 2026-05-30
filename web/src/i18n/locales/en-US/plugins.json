@@ -6,7 +6,7 @@
   "no": "No",
   "notice": {
     "title": "First use detects adapters; missing adapters can be installed directly",
-    "desc": "The switch writes the built-in MCP server into Codex config. Before desktop operations, the plugin checks Peekaboo on macOS or Windows-MCP on Windows; when missing, run npm run install-adapter or let the model call computer_install_adapter and surface progress."
+    "desc": "The switch writes the built-in MCP server into Codex config. Before desktop operations, the plugin checks for the cross-platform Trope CUA adapter; when missing, run npm run install-adapter or let the model call computer_install_adapter and surface progress."
   },
   "category": {
     "computer-use": "Computer Use"

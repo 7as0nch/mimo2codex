@@ -95,7 +95,7 @@ export const tools = [
   {
     name: "computer_install_adapter",
     description:
-      "Detect and install the platform adapter required by mimo-computer-use. Use only after explaining the third-party download plan to the user. Supports macOS Peekaboo via Homebrew and Windows-MCP via uv/uvx.",
+      "Detect and install the Trope CUA adapter required by mimo-computer-use. Use only after explaining the third-party download plan to the user.",
     inputSchema: {
       type: "object",
       properties: {

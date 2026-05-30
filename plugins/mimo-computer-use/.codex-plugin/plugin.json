@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "MiMo Computer Use",
     "shortDescription": "Let MiMo and compatible models operate the desktop through local MCP tools.",
-    "longDescription": "MiMo Computer Use exposes a small, conservative set of local desktop automation tools to Codex. It delegates actual Windows and macOS control to separately installed open-source adapters such as Windows-MCP, Peekaboo, or Trope CUA, keeping this plugin isolated from the mimo2codex proxy runtime.",
+    "longDescription": "MiMo Computer Use exposes a small, conservative set of local desktop automation tools to Codex. It delegates actual desktop control to the separately installed open-source Trope CUA adapter, keeping this plugin isolated from the mimo2codex proxy runtime.",
     "developerName": "mimo2codex contributors",
     "category": "Productivity",
     "capabilities": [

@@ -4,16 +4,21 @@ import { chooseAdapter, waitMs } from "../lib/adapters.mjs";
 import { tools } from "../lib/tools.mjs";
 import { adapterInstallPlan } from "../lib/installers.mjs";
 
-test("chooseAdapter selects platform defaults", () => {
-  assert.equal(chooseAdapter({}, "darwin").name, "peekaboo");
-  assert.equal(chooseAdapter({}, "win32").name, "windows-mcp");
-  assert.equal(chooseAdapter({}, "linux").name, "unsupported");
+test("chooseAdapter resolves to Trope CUA by default (auto) and on explicit trope", () => {
+  assert.equal(chooseAdapter({}).name, "trope-cua");
+  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "auto" }).name, "trope-cua");
+  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "trope" }).name, "trope-cua");
+  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "TROPE" }).name, "trope-cua");
 });
 
-test("chooseAdapter honors explicit backend", () => {
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "trope" }, "darwin").name, "trope-cua");
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "windows-mcp" }, "darwin").name, "windows-mcp");
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "peekaboo" }, "win32").name, "peekaboo");
+test("chooseAdapter rejects retired/unknown backends instead of falling back", async () => {
+  for (const backend of ["peekaboo", "windows-mcp", "nonsense"]) {
+    const adapter = chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: backend });
+    assert.equal(adapter.name, "unsupported");
+    const diag = await adapter.module.diagnose();
+    assert.equal(diag.ok, false);
+    assert.equal(diag.code, "unsupported_backend");
+  }
 });
 
 test("tool list exposes the stable computer-use surface plus installer", () => {
@@ -35,8 +40,25 @@ test("wait is capped and returns a structured payload", async () => {
   assert.equal(result.waited_ms, 1);
 });
 
-test("adapterInstallPlan selects platform installers", () => {
-  assert.deepEqual(adapterInstallPlan({}, "darwin").command, ["brew", "install", "steipete/tap/peekaboo"]);
-  assert.deepEqual(adapterInstallPlan({}, "win32").command, ["uv", "tool", "install", "windows-mcp"]);
-  assert.equal(adapterInstallPlan({}, "linux").code, "unsupported_platform");
+test("adapterInstallPlan builds Trope CUA from source on macOS/Windows", () => {
+  for (const platform of ["darwin", "win32"]) {
+    const plan = adapterInstallPlan({}, platform);
+    assert.equal(plan.backend, "trope-cua");
+    assert.equal(plan.ok, true);
+    assert.equal(plan.autoInstall, true);
+    assert.equal(plan.repo, "https://github.com/voctory/trope-cua");
+    assert.ok(Array.isArray(plan.steps) && plan.steps.length >= 2);
+    assert.deepEqual(plan.detects, ["trope-cua"]);
+  }
+});
+
+test("adapterInstallPlan reports unsupported platform on Linux", () => {
+  const plan = adapterInstallPlan({}, "linux");
+  assert.equal(plan.ok, false);
+  assert.equal(plan.code, "unsupported_platform");
+});
+
+test("install plan honors MIMO_COMPUTER_USE_TROPE_CMD for detection", () => {
+  const plan = adapterInstallPlan({ MIMO_COMPUTER_USE_TROPE_CMD: "/opt/trope" }, "darwin");
+  assert.deepEqual(plan.detects, ["/opt/trope"]);
 });

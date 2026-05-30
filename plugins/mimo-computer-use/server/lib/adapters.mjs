@@ -1,14 +1,15 @@
-import * as macos from "../../adapters/macos/index.mjs";
-import * as windows from "../../adapters/windows/index.mjs";
 import * as trope from "../../adapters/shared/trope/index.mjs";
 
-export function chooseAdapter(env = process.env, platform = process.platform) {
+// Trope CUA is the single backend (macOS + Windows). MIMO_COMPUTER_USE_BACKEND is
+// kept as a forward-compatible knob (so future backends can be added without a
+// config break), but "auto" / "trope" both resolve to Trope today. Any other
+// explicit value is rejected so a stale "peekaboo" / "windows-mcp" in an old
+// config.toml surfaces a clear error instead of silently falling back.
+export function chooseAdapter(env = process.env) {
   const forced = (env.MIMO_COMPUTER_USE_BACKEND || "auto").toLowerCase();
-  if (forced === "trope") return { name: "trope-cua", module: trope };
-  if (forced === "peekaboo") return { name: "peekaboo", module: macos };
-  if (forced === "windows-mcp") return { name: "windows-mcp", module: windows };
-  if (platform === "darwin") return { name: "peekaboo", module: macos };
-  if (platform === "win32") return { name: "windows-mcp", module: windows };
+  if (forced === "auto" || forced === "trope") {
+    return { name: "trope-cua", module: trope };
+  }
   return {
     name: "unsupported",
     module: {
@@ -16,9 +17,10 @@ export function chooseAdapter(env = process.env, platform = process.platform) {
         return {
           ok: false,
           backend: "unsupported",
-          platform,
-          code: "unsupported_platform",
-          message: "mimo-computer-use MVP supports macOS and Windows only.",
+          code: "unsupported_backend",
+          message:
+            `MIMO_COMPUTER_USE_BACKEND="${forced}" is not supported. ` +
+            `mimo-computer-use uses Trope CUA — set MIMO_COMPUTER_USE_BACKEND=trope or unset it (auto).`,
         };
       },
     },

@@ -16,8 +16,12 @@ function missing() {
     backend: "trope-cua",
     code: "adapter_missing",
     message:
-      "Trope CUA is not available. Install Trope CUA and set MIMO_COMPUTER_USE_BACKEND=trope when you want this shared adapter.",
-    install: "See https://trope.ai/cua and https://github.com/voctory/trope-cua.",
+      `Trope CUA is not available. Install it, then ensure \`${COMMAND}\` is on PATH ` +
+      "or set MIMO_COMPUTER_USE_TROPE_CMD / MIMO_COMPUTER_USE_TROPE_ARGS.",
+    install: {
+      helper: "npm run install-adapter",
+      docs: "https://github.com/voctory/trope-cua",
+    },
   };
 }
 

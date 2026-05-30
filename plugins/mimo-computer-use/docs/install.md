@@ -47,10 +47,10 @@ Use the mimo-computer-use computer_state tool to inspect the current desktop.
 
 Expected outcomes:
 
-- If the platform adapter is installed and permissions are granted, Codex gets a
-  JSON state summary.
-- If the adapter is missing, Codex gets a JSON setup diagnostic with the backend
-  to install.
+- If Trope CUA is installed and permissions are granted, Codex gets a JSON state
+  summary.
+- If the adapter is missing, Codex gets a JSON setup diagnostic pointing at the
+  Trope CUA install docs.
 
 ## Codex plugin
 
@@ -64,91 +64,45 @@ node ./server/index.mjs
 
 No npm dependencies are required for the plugin server itself.
 
-## macOS backend
+## Backend: Trope CUA (macOS + Windows)
 
-The built-in installer uses Homebrew:
+mimo-computer-use uses a single backend,
+[Trope CUA](https://github.com/voctory/trope-cua), on **macOS and Windows only**.
+It is the default — `MIMO_COMPUTER_USE_BACKEND` may be left unset (`auto`) or set
+explicitly to `trope`.
+
+Trope CUA is distributed as **source**. `npm run install-adapter` automates the
+whole flow: it `git clone`s the repo into `~/.mimo2codex/adapters/trope-cua`, then
+runs the platform build script. Prerequisites:
+
+- Both: `git`
+- macOS 14+: Xcode Command Line Tools; afterward grant TropeCUA.app
+  Accessibility + Screen Recording permissions. Build script: `scripts/install-macos.sh`.
+- Windows 10 1903+/11: PowerShell + the .NET SDK matching `global.json`.
+  Build script: `scripts\install-windows.ps1 -SelfContained`.
+
+Install and verify:
 
 ```bash
 cd plugins/mimo-computer-use
-npm run install-adapter
+npm run install-adapter   # git clone + platform build script
+npm run doctor            # confirms `trope-cua` is detected on PATH
 ```
 
-Equivalent manual command:
+Then self-check the installed command:
 
 ```bash
-brew install steipete/tap/peekaboo
+trope-cua --help
+trope-cua check_permissions
+trope-cua list_windows
 ```
 
-Peekaboo upstream:
+Trope CUA upstream: <https://github.com/voctory/trope-cua>
 
-<https://github.com/openclaw/Peekaboo>
-
-Then grant macOS permissions:
-
-- Screen Recording
-- Accessibility
-
-Verify:
+Override the command or its args when the executable is named differently or
+needs different startup args (the adapter invokes `trope-cua mcp` by default):
 
 ```bash
-peekaboo --help
-cd plugins/mimo-computer-use
-npm run doctor
-```
-
-If the binary is not named `peekaboo`, set:
-
-```bash
-MIMO_COMPUTER_USE_PEEKABOO_CMD=/path/to/peekaboo
-```
-
-## Windows backend
-
-The built-in installer uses uv when available:
-
-```powershell
-cd plugins\mimo-computer-use
-npm run install-adapter
-```
-
-Equivalent manual command:
-
-```powershell
-uv tool install windows-mcp
-```
-
-If `windows-mcp` is not on PATH but `uvx` exists, the adapter can run:
-
-```powershell
-uvx windows-mcp serve
-```
-
-Windows-MCP upstream:
-
-<https://github.com/CursorTouch/Windows-MCP>
-
-Verify that the command is on PATH, then run:
-
-```powershell
-cd plugins\mimo-computer-use
-npm run doctor
-```
-
-Override the command or server args when needed:
-
-```powershell
-$env:MIMO_COMPUTER_USE_WINDOWS_MCP_CMD = "windows-mcp"
-$env:MIMO_COMPUTER_USE_WINDOWS_MCP_ARGS = "mcp"
-```
-
-## Trope CUA backend
-
-Trope CUA is optional and experimental:
-
-<https://trope.ai/cua>
-
-Enable it explicitly:
-
-```bash
-MIMO_COMPUTER_USE_BACKEND=trope
+MIMO_COMPUTER_USE_TROPE_CMD=/path/to/trope-cua
+MIMO_COMPUTER_USE_TROPE_ARGS="mcp"
 ```
