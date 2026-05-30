@@ -434,6 +434,42 @@ export interface UpstreamKeySummary {
   updated_at: number;
 }
 
+export interface BuiltinPluginInfo {
+  id: string;
+  name: string;
+  description: string;
+  category: "computer-use";
+  mcpServerName: string;
+  pluginRoot: string;
+  serverPath: string;
+  docsPath: string;
+  builtin: boolean;
+  installed: boolean;
+  enabled: boolean;
+  settingEnabled: boolean;
+  envOverride: boolean | null;
+  locked: boolean;
+  configEnabled: boolean;
+  configPath: string;
+  envKey: string;
+  settingKey: string;
+  hotReload: boolean;
+  codexRestartRecommended: boolean;
+  quickstartMarkdown: string | null;
+}
+
+export interface PluginSetResponse {
+  ok: boolean;
+  apply: {
+    ok: true;
+    path: string;
+    enabled: boolean;
+    backupPath: string | null;
+    changed: boolean;
+  };
+  plugin: BuiltinPluginInfo;
+}
+
 export const api = {
   health: () => request<HealthResponse>("GET", "/health"),
   authMe: () => request<AuthMeResponse>("GET", "/auth/me"),
@@ -566,6 +602,11 @@ export const api = {
     request<LatencyStatsResponse>("GET", `/stats/latency?range=${range}`),
   providerHealth: () =>
     request<{ rows: ProviderHealthRow[] }>("GET", "/provider-health"),
+  plugins: () => request<{ plugins: BuiltinPluginInfo[] }>("GET", "/plugins"),
+  plugin: (id: string) =>
+    request<{ plugin: BuiltinPluginInfo }>("GET", `/plugins/${encodeURIComponent(id)}`),
+  setPluginEnabled: (id: string, enabled: boolean) =>
+    request<PluginSetResponse>("PUT", `/plugins/${encodeURIComponent(id)}`, { enabled }),
   settings: () => request<{ settings: Record<string, string> }>("GET", "/settings"),
   setSetting: (key: string, value: string) =>
     request<{ key: string; value: string }>("PUT", `/settings/${encodeURIComponent(key)}`, {

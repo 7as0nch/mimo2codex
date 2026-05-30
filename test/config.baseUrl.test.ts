@@ -49,4 +49,28 @@ describe("buildConfig: baseUrl resolution priority", () => {
     const cfg = build(["--no-admin", "--model", "ds"], { DS_API_KEY: "sk-ds" });
     expect(cfg.providers.deepseek!.baseUrl).toBe("https://api.deepseek.com/v1");
   });
+
+  it("parses unified MIMO2CODEX_PLUGIN values for the computer-use plugin", () => {
+    expect(
+      build(["--no-admin"], {
+        MIMO_API_KEY: "sk-abc",
+        MIMO2CODEX_PLUGIN: "mimo-computer-use",
+      }).computerUsePluginFromEnv
+    ).toBe(true);
+    expect(
+      build(["--no-admin"], {
+        MIMO_API_KEY: "sk-abc",
+        MIMO2CODEX_PLUGIN: "computer-use",
+      }).computerUsePluginFromEnv
+    ).toBe(true);
+    expect(
+      build(["--no-admin"], {
+        MIMO_API_KEY: "sk-abc",
+        MIMO2CODEX_PLUGIN: "off",
+      }).computerUsePluginFromEnv
+    ).toBe(false);
+    expect(
+      build(["--no-admin"], { MIMO_API_KEY: "sk-abc" }).computerUsePluginFromEnv
+    ).toBeUndefined();
+  });
 });

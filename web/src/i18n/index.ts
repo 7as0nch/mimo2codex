@@ -17,6 +17,7 @@ import zhTour from "./locales/zh-CN/tour.json";
 import zhAuth from "./locales/zh-CN/auth.json";
 import zhDataDir from "./locales/zh-CN/dataDir.json";
 import zhWhatsNew from "./locales/zh-CN/whatsNew.json";
+import zhPlugins from "./locales/zh-CN/plugins.json";
 import enCommon from "./locales/en-US/common.json";
 import enNav from "./locales/en-US/nav.json";
 import enSettings from "./locales/en-US/settings.json";
@@ -33,6 +34,7 @@ import enTour from "./locales/en-US/tour.json";
 import enAuth from "./locales/en-US/auth.json";
 import enDataDir from "./locales/en-US/dataDir.json";
 import enWhatsNew from "./locales/en-US/whatsNew.json";
+import enPlugins from "./locales/en-US/plugins.json";
 
 export const SUPPORTED_LANGS = ["zh-CN", "en-US"] as const;
 export type SupportedLang = (typeof SUPPORTED_LANGS)[number];
@@ -57,6 +59,7 @@ void i18n.use(initReactI18next).init({
       auth: zhAuth,
       dataDir: zhDataDir,
       whatsNew: zhWhatsNew,
+      plugins: zhPlugins,
     },
     "en-US": {
       common: enCommon,
@@ -75,6 +78,7 @@ void i18n.use(initReactI18next).init({
       auth: enAuth,
       dataDir: enDataDir,
       whatsNew: enWhatsNew,
+      plugins: enPlugins,
     },
   },
   lng: DEFAULT_LANG,
@@ -97,6 +101,7 @@ void i18n.use(initReactI18next).init({
     "auth",
     "dataDir",
     "whatsNew",
+    "plugins",
   ],
   interpolation: { escapeValue: false },
   returnEmptyString: false,

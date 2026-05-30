@@ -4,6 +4,7 @@
   "codexEnable": "Codex Integration",
   "sessions": "Session Manager",
   "providers": "Providers",
+  "plugins": "Plugins",
   "models": "Built-in Models",
   "logs": "Logs"
 }

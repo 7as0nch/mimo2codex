@@ -64,10 +64,20 @@ import {
   isMaintenance,
 } from "../util/maintenance.js";
 import { authJsonPath, configTomlPath } from "../codex/paths.js";
+import { readConfigTomlIfExists } from "../codex/files.js";
 import {
   renderApplyPowerShellScript,
   renderApplyShellScript,
 } from "../codex/bundle.js";
+import {
+  BUILTIN_COMPUTER_USE_PLUGIN_ID,
+  COMPUTER_USE_SETTING_KEY,
+  applyMcpServerEnabled,
+  builtinComputerUsePlugin,
+  configHasMcpServer,
+  readMcpPluginInstalled,
+  readQuickstartMarkdown,
+} from "../codex/plugins.js";
 import {
   appendCodexHistory,
   deleteCodexHistory,
@@ -255,6 +265,38 @@ interface RouteContext {
   pathname: string;
   query: URLSearchParams;
   auth: AuthContext;
+}
+
+function readComputerUsePluginSetting(): boolean {
+  try {
+    return getSetting(COMPUTER_USE_SETTING_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readComputerUsePluginAdminState(cfg: Config): Record<string, unknown> {
+  const plugin = builtinComputerUsePlugin();
+  const settingEnabled = readComputerUsePluginSetting();
+  const envOverride = cfg.computerUsePluginFromEnv ?? null;
+  const enabled = envOverride !== null ? envOverride : settingEnabled;
+  const configText = readConfigTomlIfExists();
+  return {
+    ...plugin,
+    builtin: true,
+    installed: readMcpPluginInstalled(),
+    enabled,
+    settingEnabled,
+    envOverride,
+    locked: envOverride !== null,
+    configEnabled: configHasMcpServer(configText, plugin.mcpServerName),
+    configPath: configTomlPath(),
+    envKey: "MIMO2CODEX_PLUGIN",
+    settingKey: COMPUTER_USE_SETTING_KEY,
+    hotReload: true,
+    codexRestartRecommended: true,
+    quickstartMarkdown: readQuickstartMarkdown(),
+  };
 }
 
 async function handleApi(ctx: RouteContext): Promise<void> {
@@ -1022,6 +1064,53 @@ async function handleApi(ctx: RouteContext): Promise<void> {
       setSetting("logging.silentRewrite", body.silentRewrite ? "1" : "0");
       log.info(`logging.silentRewrite set to ${body.silentRewrite} via admin UI`);
       return sendJson(res, 200, { ok: true });
+    }
+    return sendError(res, 405, "method_not_allowed", "use GET or PUT");
+  }
+
+  // Built-in plugins: currently only mimo-computer-use. The env var wins over
+  // DB state; without env, the UI can hot-write ~/.codex/config.toml so Codex
+  // sees the MCP server on next start/restart.
+  if (req.method === "GET" && pathname === "/admin/api/plugins") {
+    return sendJson(res, 200, {
+      plugins: [readComputerUsePluginAdminState(cfg)],
+    });
+  }
+
+  const pluginRoute = pathname.match(/^\/admin\/api\/plugins\/([^/]+)$/);
+  if (pluginRoute) {
+    const id = decodeURIComponent(pluginRoute[1]);
+    if (id !== BUILTIN_COMPUTER_USE_PLUGIN_ID) {
+      return sendError(res, 404, "plugin_not_found", `plugin ${id} not found`);
+    }
+    if (req.method === "GET") {
+      return sendJson(res, 200, { plugin: readComputerUsePluginAdminState(cfg) });
+    }
+    if (req.method === "PUT") {
+      if (!requireAdmin(ctx)) return;
+      if (cfg.computerUsePluginFromEnv !== undefined) {
+        return sendError(
+          res,
+          409,
+          "env_override",
+          "MIMO2CODEX_PLUGIN is set; remove it and restart mimo2codex to manage this plugin from the admin UI."
+        );
+      }
+      const body = await readJsonBody<{ enabled?: unknown }>(req);
+      if (typeof body.enabled !== "boolean") {
+        return sendError(res, 400, "invalid_body", "enabled must be a boolean");
+      }
+      setSetting(COMPUTER_USE_SETTING_KEY, body.enabled ? "1" : "0");
+      const applied = applyMcpServerEnabled(body.enabled);
+      log.info(`plugin ${id} set to ${body.enabled} via admin UI`, {
+        configPath: applied.path,
+        changed: applied.changed,
+      });
+      return sendJson(res, 200, {
+        ok: true,
+        apply: applied,
+        plugin: readComputerUsePluginAdminState(cfg),
+      });
     }
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");
   }

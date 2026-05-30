@@ -15,16 +15,10 @@
 
 import type { ReactNode } from "react";
 import {
-  ApiOutlined,
-  AppstoreOutlined,
-  BugOutlined,
-  CodeOutlined,
-  DashboardOutlined,
+  CloudDownloadOutlined,
   DesktopOutlined,
-  HistoryOutlined,
-  ReloadOutlined,
-  SettingOutlined,
-  ThunderboltOutlined,
+  FileTextOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
 
 export interface BilingualText {
@@ -60,118 +54,57 @@ export interface ReleaseNote {
 // doc/tag-log.{md,zh.md} for users who want the full history.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: "0.5.20",
-    date: "2026-05-29",
+    version: "0.5.21",
+    date: "2026-05-30",
     title: {
-      en: "Session Manager, header status, safer config switching",
-      zh: "会话管理、顶栏状态、更稳的切配置",
+      en: "MiMo Computer Use plugin",
+      zh: "MiMo Computer Use 插件",
     },
     summary: {
-      en: "A roll-up release: a new Session Manager, live status in the header, config switching that preserves your settings, 429 retry, and desktop quality-of-life.",
-      zh: "一个汇总版本：新增会话管理、顶栏实时状态、切配置不丢设置、429 重试、以及一批桌面端体验优化。",
+      en: "A built-in Codex MCP plugin for local desktop control, with Admin toggles, env locking, adapter detection, and guided install.",
+      zh: "新增内置 Codex MCP 电脑控制插件，支持后台开关、环境变量锁定、adapter 检测与引导安装。",
     },
     highlights: [
       {
-        kind: "fixed",
-        icon: <ApiOutlined />,
-        title: { en: "429 no longer breaks the session", zh: "429 不再中断会话" },
+        kind: "new",
+        icon: <DesktopOutlined />,
+        title: { en: "MiMo Computer Use plugin", zh: "MiMo Computer Use 插件" },
         description: {
-          en: "Transient upstream 429 / 5xx are retried with backoff (honoring Retry-After) instead of bubbling up to Codex.",
-          zh: "上游瞬时 429 / 5xx 改为退避重试（遵循 Retry-After），不再透传给 Codex 触发「exceeded retry limit」。",
+          en: "A new isolated Codex MCP plugin lets MiMo-compatible models drive macOS/Windows through detected or guided-installed adapters.",
+          zh: "新增独立 Codex MCP 插件，让 MiMo 兼容模型通过检测或引导安装的 adapter 操控 macOS / Windows。",
         },
-      },
-      {
-        kind: "fixed",
-        icon: <BugOutlined />,
-        title: { en: "“Write files and enable” keeps your config.toml", zh: "「写入文件并启用」不丢 config.toml 设置" },
-        description: {
-          en: "Switching models now surgically merges only the model/provider keys — [projects], [mcp_servers], reasoning, comments all stay.",
-          zh: "切换模型只合并模型/provider 字段，[projects]、[mcp_servers]、reasoning、注释等原样保留。",
-        },
+        location: { en: "plugins/mimo-computer-use", zh: "plugins/mimo-computer-use" },
       },
       {
         kind: "new",
-        icon: <HistoryOutlined />,
-        title: { en: "Session Manager", zh: "会话管理" },
+        icon: <ToolOutlined />,
+        title: { en: "Plugins page + MIMO2CODEX_PLUGIN", zh: "插件页 + MIMO2CODEX_PLUGIN" },
         description: {
-          en: "Browse every Codex session across providers (provider → project → session); migrate one, or batch-migrate selected, to another provider.",
-          zh: "跨 provider 浏览所有 Codex 会话（provider → 项目 → 会话）；可单个迁移或勾选批量迁移到另一个 provider。",
+          en: "Enable built-in plugins from Admin → Plugins, or lock CLI, desktop, and Docker deployments with MIMO2CODEX_PLUGIN.",
+          zh: "可在 Admin → 插件 启用内置插件，也可用 MIMO2CODEX_PLUGIN 锁定命令行、桌面端和 Docker 部署。",
         },
-        location: { en: "Left nav → Session Manager", zh: "左侧导航 → 会话管理" },
+        location: { en: "Left nav → Plugins", zh: "左侧导航 → 插件" },
         ctaLabel: { en: "Open", zh: "打开" },
-        ctaPath: "/sessions",
+        ctaPath: "/plugins",
       },
       {
         kind: "new",
-        icon: <CodeOutlined />,
-        title: { en: "Session preview + Markdown export", zh: "会话预览 + 导出 Markdown" },
+        icon: <CloudDownloadOutlined />,
+        title: { en: "First-use adapter install", zh: "首次 adapter 检测与安装" },
         description: {
-          en: "Preview a session's chat (tool calls collapsed to keep text front-and-center) and export it to Markdown.",
-          zh: "预览会话聊天记录（工具调用默认折叠以突出文本），并可导出为 Markdown。",
+          en: "Run npm run doctor / install-adapter, or let the MCP tool install Peekaboo on macOS and Windows-MCP on Windows with visible progress.",
+          zh: "可运行 npm run doctor / install-adapter，也可让 MCP 工具安装 macOS Peekaboo 或 Windows-MCP 并显示进度。",
         },
       },
       {
-        kind: "new",
-        icon: <DashboardOutlined />,
-        title: { en: "Live “当前状态” in the header", zh: "顶栏「当前状态」实时显示" },
+        kind: "doc",
+        icon: <FileTextOutlined />,
+        title: { en: "Detailed plugin guide", zh: "插件详细说明" },
         description: {
-          en: "Effective provider·model now rides in the top bar as a rotating chip; click for the full state.",
-          zh: "当前生效的 provider·model 以跑马灯芯片常驻顶栏，点击查看完整状态。",
+          en: "New docs cover architecture, Admin/env enablement, mimoskill setup, packaging, and troubleshooting.",
+          zh: "新增文档说明架构、Admin/env 启用、mimoskill 流程、打包方式与故障排查。",
         },
-      },
-      {
-        kind: "improved",
-        icon: <AppstoreOutlined />,
-        title: { en: "Codex page slimmed", zh: "Codex 接入页精简" },
-        description: {
-          en: "Down to just the model-switch table; the current-state card moved to the header and the quick-switch bar was dropped.",
-          zh: "精简为只剩切模型表格；当前状态卡片挪到顶栏，快速切换栏移除。",
-        },
-      },
-      {
-        kind: "new",
-        icon: <ReloadOutlined />,
-        title: { en: "Restart Codex after applying", zh: "应用配置后重启 Codex" },
-        description: {
-          en: "After “写入文件并启用”, mimo2codex offers to restart Codex Desktop so the change takes effect.",
-          zh: "「写入文件并启用」后弹窗询问是否帮你重启 Codex 桌面端使配置生效。",
-        },
-      },
-      {
-        kind: "new",
-        icon: <DesktopOutlined />,
-        title: { en: "Desktop: open Codex on launch", zh: "桌面端：启动时打开 Codex" },
-        description: {
-          en: "If Codex isn't running when you start the desktop app, it asks whether to launch it.",
-          zh: "启动桌面端时若 Codex 未运行，会询问是否帮你打开。",
-        },
-      },
-      {
-        kind: "improved",
-        icon: <DesktopOutlined />,
-        title: { en: "Desktop: double-click tray → console", zh: "桌面端：双击托盘开控制台" },
-        description: {
-          en: "Double-clicking the tray icon opens the admin console directly.",
-          zh: "双击系统托盘图标直接打开管理控制台。",
-        },
-      },
-      {
-        kind: "improved",
-        icon: <SettingOutlined />,
-        title: { en: "Backups tidied away", zh: "备份归入独立目录" },
-        description: {
-          en: "Per-switch backups moved into a hidden ~/.codex/.m2c-backups/ folder so they stop cluttering the codex dir.",
-          zh: "每次切换的备份迁入隐藏的 ~/.codex/.m2c-backups/ 目录，不再污染 codex 目录。",
-        },
-      },
-      {
-        kind: "improved",
-        icon: <ThunderboltOutlined />,
-        title: { en: "Model-rewrite log silent by default", zh: "模型改写日志默认静默" },
-        description: {
-          en: "The “model fallback applied” log is suppressed by default; toggle it under the header “更多” menu.",
-          zh: "「model fallback applied」日志默认静默；可在顶栏「更多」菜单里开关。",
-        },
+        location: { en: "doc/mimo-computer-use-plugin.zh.md", zh: "doc/mimo-computer-use-plugin.zh.md" },
       },
     ],
   },

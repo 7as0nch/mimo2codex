@@ -1,0 +1,45 @@
+{
+  "title": "插件",
+  "subtitle": "管理 mimo2codex 自带的 Codex 本地插件。环境变量优先于后台开关。",
+  "refresh": "刷新",
+  "yes": "是",
+  "no": "否",
+  "notice": {
+    "title": "首次使用会先检测 adapter，缺失时可直接安装",
+    "desc": "启用开关会把内置 MCP server 写入 Codex 配置。真正操作桌面前，插件会检测 macOS 的 Peekaboo 或 Windows 的 Windows-MCP；缺失时可运行 npm run install-adapter，或让模型调用 computer_install_adapter 并显示安装进度。"
+  },
+  "category": {
+    "computer-use": "Computer Use"
+  },
+  "status": {
+    "enabled": "已启用",
+    "disabled": "未启用",
+    "envLocked": "Env 锁定",
+    "missing": "插件文件缺失"
+  },
+  "envLocked": {
+    "title": "{{envKey}} 已设置，后台开关只读",
+    "desc": "当前环境变量生效值为：{{value}}。如需改用后台热更新，请移除该变量并重启 mimo2codex。"
+  },
+  "configMismatch": {
+    "title": "插件状态与 Codex 配置不一致",
+    "desc": "当前期望为启用，但 config.toml 里还没有对应 MCP server。点击刷新，或重新切换一次开关。"
+  },
+  "fields": {
+    "id": "插件 ID",
+    "mcpServer": "MCP Server",
+    "configPath": "Codex 配置",
+    "serverPath": "插件入口",
+    "envKey": "环境变量",
+    "configEnabled": "已写入配置"
+  },
+  "usage": {
+    "title": "启用后怎么用",
+    "desc": "重启 Codex CLI / Desktop 后，模型会看到 computer_state、computer_click、computer_type、computer_key、computer_scroll、computer_wait、computer_install_adapter 这些 MCP 工具。",
+    "prompt": "请调用 computer_state 看看当前屏幕状态，并告诉我可用的下一步操作。"
+  },
+  "msg": {
+    "enabled": "插件已启用，已热写 Codex 配置；重启 Codex 后生效。",
+    "disabled": "插件已停用，已从 Codex 配置移除。"
+  }
+}

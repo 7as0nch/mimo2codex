@@ -51,6 +51,12 @@ function copyCliArtifacts() {
   if (existsSync(resolve(root, "mimoskill"))) {
     cpSync(resolve(root, "mimoskill"), resolve(sidecarOut, "mimoskill"), { recursive: true });
   }
+  // Built-in Codex MCP plugins are resolved at runtime from <sidecar>/plugins.
+  // Keep them beside dist/ so CLI, desktop sidecar, and npm-global installs
+  // all share the same repo-root-relative layout.
+  if (existsSync(resolve(root, "plugins"))) {
+    cpSync(resolve(root, "plugins"), resolve(sidecarOut, "plugins"), { recursive: true });
+  }
   cpSync(resolve(root, "package.json"), resolve(sidecarOut, "package.json"));
 
   // Critical: tell prebuild-install to fetch the **Electron-runtime** prebuild

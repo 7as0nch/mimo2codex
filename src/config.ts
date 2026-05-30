@@ -54,6 +54,10 @@ export interface Config {
   //   undefined  → runtime reads settings DB (admin UI toggle), default silent
   // server.ts resolveSilentRewrite() implements env > settings > true.
   silentRewriteFromCli?: boolean;
+  // Built-in plugin override. true/false means env explicitly controls the
+  // plugin and admin UI cannot change it; undefined means settings DB controls
+  // it and can be hot-applied from the Plugins page.
+  computerUsePluginFromEnv?: boolean;
 }
 
 const DEFAULTS = {
@@ -302,7 +306,23 @@ export function buildConfig(parsed: ParsedArgs, env: NodeJS.ProcessEnv, version:
         : env.MIMO2CODEX_SILENT_REWRITE === "0" || env.MIMO2CODEX_SILENT_REWRITE === "false"
           ? false
           : undefined,
+    computerUsePluginFromEnv: parsePluginEnvForComputerUse(env.MIMO2CODEX_PLUGIN),
   };
+}
+
+function parsePluginEnvForComputerUse(raw: string | undefined): boolean | undefined {
+  const v = raw?.toLowerCase().trim();
+  if (!v) return undefined;
+  if (v === "1" || v === "true" || v === "yes" || v === "on") return true;
+  if (v === "0" || v === "false" || v === "no" || v === "off" || v === "none") return false;
+  const enabled = new Set(
+    v
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  if (enabled.has("mimo-computer-use") || enabled.has("computer-use")) return true;
+  return undefined;
 }
 
 function resolveAuthMode(

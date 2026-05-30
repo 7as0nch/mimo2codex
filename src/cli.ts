@@ -34,6 +34,7 @@ import {
   redactProxyUrl,
   type ProxyStatus,
 } from "./upstream/proxyDispatcher.js";
+import { applyMcpServerEnabled } from "./codex/plugins.js";
 
 // Discover the data-dir path WITHOUT creating it. Used for print-config /
 // print-cc-switch subcommands so a one-shot snippet print doesn't have
@@ -619,6 +620,20 @@ async function main(): Promise<void> {
   }
 
   setVerbose(cfg.verbose);
+
+  if (cfg.computerUsePluginFromEnv !== undefined) {
+    try {
+      const applied = applyMcpServerEnabled(cfg.computerUsePluginFromEnv);
+      log.info(
+        `plugin mimo-computer-use ${cfg.computerUsePluginFromEnv ? "enabled" : "disabled"} by MIMO2CODEX_PLUGIN`,
+        { configPath: applied.path, changed: applied.changed }
+      );
+    } catch (err) {
+      log.warn("failed to apply MIMO2CODEX_PLUGIN to Codex config", {
+        error: (err as Error).message,
+      });
+    }
+  }
 
   // Install undici proxy dispatcher from env BEFORE any fetch happens (update
   // check, upstream calls, etc.). With no HTTP_PROXY/HTTPS_PROXY in env this

@@ -29,6 +29,7 @@ RUN npm_config_target_arch=${TARGETARCH} npm ci && \
 COPY tsconfig.json ./
 COPY src/ ./src/
 COPY web/ ./web/
+COPY plugins/ ./plugins/
 
 # 构建后端 + 前端
 RUN npm run build:all
@@ -66,6 +67,7 @@ ENV MIMO2CODEX_AUTH=on
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/plugins ./plugins
 COPY package.json ./
 COPY .env.example ./.env.example
 

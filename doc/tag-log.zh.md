@@ -17,7 +17,13 @@ mimo2codex 的版本发布历史，按 tag 倒序排列。
 
 ---
 
-## v0.5.20 (upcoming)
+## v0.5.21 (upcoming)
+
+- **[new]** **新增 `mimo-computer-use` 本地 Codex 插件骨架**：新插件独立放在 `plugins/mimo-computer-use/`，给 MiMo、DeepSeek 以及其它兼容 OpenAI function calling 的模型暴露一组保守的 MCP 电脑控制工具（`computer_state`、`computer_click`、`computer_type`、`computer_key`、`computer_scroll`、`computer_wait`）。它**不改**代理对 `computer_use_preview` 的处理，也不碰现有运行时代码。真实桌面自动化交给平台 adapter：macOS 用 Peekaboo，Windows 用 Windows-MCP，Trope CUA 作为可选 shared adapter；工具结果只返回文本 JSON 摘要 / 截图路径，不把图片塞进 tool result，避免破坏 MiMo / DeepSeek 的历史兼容性。
+- **[new]** **新增 Admin 插件页 + 统一 `MIMO2CODEX_PLUGIN` 环境变量控制**：管理控制台新增独立的**插件**路由，用来管理 mimo2codex 自带的本地 Codex 插件，首个内置项是 `mimo-computer-use`。当 `MIMO2CODEX_PLUGIN` 未设置时，页面可启用/停用插件，并热写 `~/.codex/config.toml` 里的 `[mcp_servers.mimo-computer-use]` 块；当环境变量已设置（`mimo-computer-use` / `computer-use` / `1` / `on` 表示启用，`0` / `off` / `none` 表示禁用）时，env 优先，后台开关自动锁定为只读，方便部署环境保持确定性。插件目录也已纳入 npm 包、Docker 镜像和桌面端 sidecar bundle，保证命令行启动、桌面端、容器部署都能看到同一套内置插件清单。
+- **[new]** **Computer use 首次 adapter 检测与引导安装**：`mimo-computer-use` 现在提供 `npm run doctor`、`npm run install-adapter` 和 MCP 工具 `computer_install_adapter`。macOS 安装器调用 `brew install steipete/tap/peekaboo`；Windows 安装器调用 `uv tool install windows-mcp`，或在只有 `uvx` 时使用 `uvx windows-mcp`。缺少 adapter 时诊断结果会带安装命令；`mimoskill/scripts/computer_use_setup.py` 也会在 MiMo 电脑操作流程前先检测 / 安装 adapter，再继续控制桌面。
+- **[doc]** **新增插件详细说明文档**：新增 `doc/mimo-computer-use-plugin.zh.md`，覆盖插件架构、Admin UI / env 启用、首次 adapter 安装、mimoskill 集成、命令行 / 桌面端 / Docker 打包方式与故障排查。
+- **[doc]** **补齐 `mimo-computer-use` 现有 Codex 环境启用教程**：插件文档现在包含可直接追加到 `~/.codex/config.toml` 的 `[mcp_servers.mimo-computer-use]` 片段、重启步骤、`npm run doctor` 诊断命令、adapter 安装提示，以及第一条用于验证 `computer_state` 的 Codex 提示词。
 
 - **[fix]** **上游 429 / 5xx 瞬时错误不再中断会话（「exceeded retry limit, last status: 429」）**：以前代理会把限流直接透传回 Codex，Codex 用完自己的 `request_max_retries` 就放弃，用户只能手动点「继续」。现在 mimo2codex 自己兜底：`postUpstream` 对 `429` 和 `500/502/503/504`（以及网络连接失败）做指数退避 + 抖动重试，并遵循上游的 `Retry-After` 头（上限 10 秒，避免 Codex 等到超时）。重试可被中断——退避期间 Codex 取消会立即停止。非可重试错误（400/401/403 等）仍快速失败。可通过 `MIMO2CODEX_UPSTREAM_MAX_RETRIES`（默认 3）和 `MIMO2CODEX_UPSTREAM_RETRY_BASE_MS`（默认 500）调整。
 

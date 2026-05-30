@@ -4,6 +4,7 @@
   "codexEnable": "Codex 接入",
   "sessions": "会话管理",
   "providers": "通用 Provider",
+  "plugins": "插件",
   "models": "内置模型",
   "logs": "日志"
 }

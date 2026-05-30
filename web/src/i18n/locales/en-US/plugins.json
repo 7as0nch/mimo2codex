@@ -1,0 +1,45 @@
+{
+  "title": "Plugins",
+  "subtitle": "Manage built-in local Codex plugins shipped with mimo2codex. Environment variables override UI toggles.",
+  "refresh": "Refresh",
+  "yes": "Yes",
+  "no": "No",
+  "notice": {
+    "title": "First use detects adapters; missing adapters can be installed directly",
+    "desc": "The switch writes the built-in MCP server into Codex config. Before desktop operations, the plugin checks Peekaboo on macOS or Windows-MCP on Windows; when missing, run npm run install-adapter or let the model call computer_install_adapter and surface progress."
+  },
+  "category": {
+    "computer-use": "Computer Use"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "envLocked": "Env locked",
+    "missing": "Plugin files missing"
+  },
+  "envLocked": {
+    "title": "{{envKey}} is set, so the UI toggle is read-only",
+    "desc": "The current environment value resolves to: {{value}}. Remove it and restart mimo2codex to use admin hot updates instead."
+  },
+  "configMismatch": {
+    "title": "Plugin state and Codex config differ",
+    "desc": "The plugin is expected to be enabled, but config.toml does not contain the MCP server yet. Refresh or toggle it again."
+  },
+  "fields": {
+    "id": "Plugin ID",
+    "mcpServer": "MCP Server",
+    "configPath": "Codex config",
+    "serverPath": "Plugin entry",
+    "envKey": "Environment variable",
+    "configEnabled": "Written to config"
+  },
+  "usage": {
+    "title": "How to use it after enabling",
+    "desc": "Restart Codex CLI / Desktop and the model can see computer_state, computer_click, computer_type, computer_key, computer_scroll, computer_wait, and computer_install_adapter MCP tools.",
+    "prompt": "Please call computer_state, inspect the current screen, and tell me the available next steps."
+  },
+  "msg": {
+    "enabled": "Plugin enabled and Codex config updated; restart Codex to load it.",
+    "disabled": "Plugin disabled and removed from Codex config."
+  }
+}

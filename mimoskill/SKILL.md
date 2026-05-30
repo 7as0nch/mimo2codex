@@ -1,6 +1,6 @@
 ---
 name: mimoskill
-description: Use Xiaomi MiMo V2.5 (the LLM behind mimo2codex) for chat, vision, web search, TTS and ASR — and route around capabilities MiMo doesn't natively support, especially OCR / image recognition / 识图 / 提取图片文字 / extract text from image when the current model can't see images, and image generation / 图像生成 / 生成图片 / draw a picture / 画一张 including Codex Pets `/hatch`. Trigger when the user mentions MiMo, calls into mimo2codex, asks to read text from an image, asks to describe or 识别 an image while using a non-vision model (mimo-v2.5-pro, mimo-v2-flash, …), asks to generate / hatch a Codex pet, asks for image generation while using MiMo as the chat backend, or hits a "no image generation available" / "image_gen tool unavailable" / "this model does not support image input" message inside Codex.
+description: Use Xiaomi MiMo V2.5 (the LLM behind mimo2codex) for chat, vision, web search, TTS and ASR — and route around capabilities MiMo doesn't natively support, especially OCR / image recognition / 识图 / 提取图片文字 / extract text from image when the current model can't see images, image generation / 图像生成 / 生成图片 / draw a picture / 画一张 including Codex Pets `/hatch`, and MiMo-backed computer-use setup. Trigger when the user mentions MiMo, calls into mimo2codex, asks to read text from an image, asks to describe or 识别 an image while using a non-vision model (mimo-v2.5-pro, mimo-v2-flash, …), asks to generate / hatch a Codex pet, asks for image generation while using MiMo as the chat backend, asks MiMo/Codex to operate/control the computer/desktop/app/window, or hits a "no image generation available" / "image_gen tool unavailable" / "this model does not support image input" message inside Codex.
 ---
 
 # mimoskill — Xiaomi MiMo V2.5 + gap fillers
@@ -23,6 +23,11 @@ These are non-negotiable when operating inside Codex pointed at this proxy:
   `mimoskill/scripts/` first — most things are already there in stdlib.
 - **Non-vision model + image input → OCR it.** When the chat model can't see
   images, run `scripts/ocr.py` — never ask the user to switch models.
+- **Computer operation request → check the adapter first.** If the user asks
+  MiMo/Codex to operate the desktop, run `scripts/computer_use_setup.py`. If it
+  reports `adapter_missing`, briefly explain the third-party adapter that will
+  be installed, then run `scripts/computer_use_setup.py --install` and surface
+  progress. Do not silently skip setup and then attempt blind clicks.
 
 ## When to use
 
@@ -33,6 +38,7 @@ Trigger this skill when:
 - User wants image generation as part of a MiMo-backed workflow
 - User pastes the Codex error: `the image generation tool (image_gen) is not available in this environment` or `the CLI fallback requires the openai Python package`
 - User wants to **OCR / read text from / describe / 识别 / 提取文字 from an image** while the active chat model is non-vision (e.g. mimo-v2.5-pro, mimo-v2-flash, deepseek-*, or any third-party text-only model) — use `scripts/ocr.py`. Works with or without a MiMo key (free pollinations fallback when `MIMO_API_KEY` is unset).
+- User wants to **operate / control / click / type on the computer or desktop** through MiMo/Codex — use `scripts/computer_use_setup.py` first. If the adapter is missing, tell the user what will be installed and run `scripts/computer_use_setup.py --install`; after setup, continue with the `mimo-computer-use` MCP tools.
 - User sees the proxy's `[N image attachment(s) omitted: this model does not support image input …]` placeholder in their transcript
 - Anything in the `mimo2codex` repo that touches a feature MiMo doesn't support
 
@@ -53,6 +59,7 @@ Quick answer:
 | **Image generation** | ❌ | — | `scripts/generate_image.py` (general) or `scripts/generate_pet.py` (Codex pets) — see below |
 | OCR / 识图 (when chat model is non-vision) | ⚠️ via `mimo-v2.5` or free pollinations | `scripts/ocr.py` | `--engine auto`: mimo if `MIMO_API_KEY` set, else pollinations (no key) |
 | Code interpreter / sandbox | ❌ | — | not provided |
+| Computer use / desktop control | ⚠️ via local MCP plugin | `mimo-computer-use` | Requires local adapter: Peekaboo on macOS, Windows-MCP on Windows |
 
 For the full capability matrix and examples, read [references/models.md](references/models.md).
 
@@ -66,12 +73,49 @@ when the active chat model is non-vision?
     │
     Is it chat / vision / search / TTS / ASR with a vision-capable model?
     ├── Yes → use MiMo directly (see "Calling MiMo directly" below) or via mimo2codex if Codex is the client
-    └── No, they want image generation
+    └── No
+        │
+        Do they want to operate/control the computer?
+        ├── Yes → run scripts/computer_use_setup.py, install adapter if missing, then use mimo-computer-use MCP tools
+        └── No, they want image generation
         │
         Is it for a Codex pet (`/hatch`)?
         ├── Yes → see "Generating a Codex pet" below (scripts/generate_pet.py + install_pet.sh)
         └── No  → see "General (non-pet) image generation" below (scripts/generate_image.py)
 ```
+
+## Computer use / desktop control setup
+
+When the user asks MiMo/Codex to operate the desktop, first diagnose the local
+adapter:
+
+```bash
+python3 mimoskill/scripts/computer_use_setup.py
+```
+
+If the JSON says `adapter_missing`, tell the user exactly what will happen, then
+start the installer and relay progress:
+
+```bash
+python3 mimoskill/scripts/computer_use_setup.py --install
+```
+
+Current installer behavior:
+
+- macOS: uses Homebrew to run `brew install steipete/tap/peekaboo`, then the
+  user must grant Screen Recording and Accessibility permissions.
+- Windows: uses `uv tool install windows-mcp` when uv is available; if only uvx
+  is available, it resolves/caches Windows-MCP for `uvx windows-mcp serve`.
+- Linux: not supported in the first plugin version.
+
+If Codex sandbox/network policy blocks the install command, ask for permission
+to rerun outside the sandbox. Do not tell the user to install Python packages by
+hand unless both uv and uvx are missing on Windows.
+
+After setup, continue with the local MCP tools exposed by
+`plugins/mimo-computer-use`: `computer_state`, `computer_click`,
+`computer_type`, `computer_key`, `computer_scroll`, `computer_wait`, and
+`computer_install_adapter`.
 
 ## Calling chat directly (works without any key)
 

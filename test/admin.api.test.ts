@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os, { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeDb, openDb } from "../src/db/index.js";
@@ -87,6 +87,46 @@ describe("admin REST", () => {
     expect(mimo.default).toBe(true);
     const ds = list.find((p) => p.id === "deepseek")!;
     expect(ds.enabled).toBe(false);
+  });
+
+  it("GET /admin/api/plugins lists the built-in computer-use plugin", async () => {
+    const { status, json } = await call("GET", "/admin/api/plugins");
+    expect(status).toBe(200);
+    const plugins = (json as { plugins: Array<{ id: string; envKey: string; installed: boolean }> }).plugins;
+    expect(plugins.find((p) => p.id === "mimo-computer-use")).toMatchObject({
+      envKey: "MIMO2CODEX_PLUGIN",
+      installed: true,
+    });
+  });
+
+  it("PUT /admin/api/plugins/mimo-computer-use hot-writes Codex config when env is unset", async () => {
+    const oldCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = join(dataDir, "codex-home");
+    try {
+      const enabled = await call("PUT", "/admin/api/plugins/mimo-computer-use", { enabled: true });
+      expect(enabled.status).toBe(200);
+      const configPath = join(process.env.CODEX_HOME, "config.toml");
+      expect(existsSync(configPath)).toBe(true);
+      expect(readFileSync(configPath, "utf-8")).toContain("[mcp_servers.mimo-computer-use]");
+
+      const disabled = await call("PUT", "/admin/api/plugins/mimo-computer-use", { enabled: false });
+      expect(disabled.status).toBe(200);
+      expect(readFileSync(configPath, "utf-8")).not.toContain("[mcp_servers.mimo-computer-use]");
+    } finally {
+      if (oldCodexHome === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = oldCodexHome;
+    }
+  });
+
+  it("PUT /admin/api/plugins/mimo-computer-use is locked when MIMO2CODEX_PLUGIN set the env override", async () => {
+    cfg.computerUsePluginFromEnv = true;
+    try {
+      const resp = await call("PUT", "/admin/api/plugins/mimo-computer-use", { enabled: false });
+      expect(resp.status).toBe(409);
+      expect((resp.json as { error: { code: string } }).error.code).toBe("env_override");
+    } finally {
+      cfg.computerUsePluginFromEnv = undefined;
+    }
   });
 
   it("GET /admin/api/providers/mimo/models lists builtins", async () => {
