@@ -1,0 +1,20 @@
+{
+  "name": "mimo-computer-use",
+  "version": "0.1.0",
+  "description": "Codex MCP plugin that adapts Windows-MCP, Peekaboo, and Trope CUA for MiMo-friendly computer use.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "mimo-computer-use": "./server/index.mjs"
+  },
+  "scripts": {
+    "start": "node ./server/index.mjs",
+    "test": "node --test ./server/test/*.test.mjs",
+    "doctor": "node ./server/index.mjs --doctor",
+    "install-adapter": "node ./server/index.mjs --install-adapter"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

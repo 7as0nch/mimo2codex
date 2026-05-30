@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mimo-computer-use": {
+      "command": "node",
+      "args": [
+        "./server/index.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "MIMO_COMPUTER_USE_BACKEND": "auto"
+      }
+    }
+  }
+}

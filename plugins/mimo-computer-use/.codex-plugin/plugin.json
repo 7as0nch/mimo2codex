@@ -1,0 +1,38 @@
+{
+  "name": "mimo-computer-use",
+  "version": "0.1.0",
+  "description": "Cross-platform local computer-use tools for MiMo and OpenAI-compatible models in Codex.",
+  "author": {
+    "name": "mimo2codex contributors",
+    "url": "https://github.com/7as0nch/mimo2codex"
+  },
+  "homepage": "https://github.com/7as0nch/mimo2codex",
+  "repository": "https://github.com/7as0nch/mimo2codex",
+  "license": "MIT",
+  "keywords": [
+    "mimo",
+    "computer-use",
+    "mcp",
+    "desktop-automation",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MiMo Computer Use",
+    "shortDescription": "Let MiMo and compatible models operate the desktop through local MCP tools.",
+    "longDescription": "MiMo Computer Use exposes a small, conservative set of local desktop automation tools to Codex. It delegates actual Windows and macOS control to separately installed open-source adapters such as Windows-MCP, Peekaboo, or Trope CUA, keeping this plugin isolated from the mimo2codex proxy runtime.",
+    "developerName": "mimo2codex contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Inspect the current app and tell me what you can click.",
+      "Use the computer tools to fill this form.",
+      "Diagnose why desktop control is unavailable."
+    ],
+    "brandColor": "#4F46E5"
+  },
+  "mcpServers": "./.mcp.json"
+}
