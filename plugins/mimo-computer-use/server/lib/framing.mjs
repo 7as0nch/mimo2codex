@@ -1,11 +1,13 @@
 const HEADER_END = "\r\n\r\n";
 
+// MCP's stdio transport is newline-delimited JSON-RPC — one compact JSON object
+// per line, no embedded newlines. (Content-Length framing is the LSP convention,
+// not MCP; spec-compliant peers like Codex and the Python/TS adapters read by
+// line and choke on a Content-Length header.) MessageReader still accepts the
+// legacy Content-Length form below for robustness, but everything we WRITE must
+// be newline-delimited so real peers can parse it.
 export function encodeMessage(message) {
-  const body = Buffer.from(JSON.stringify(message), "utf8");
-  return Buffer.concat([
-    Buffer.from(`Content-Length: ${body.length}${HEADER_END}`, "utf8"),
-    body,
-  ]);
+  return Buffer.from(`${JSON.stringify(message)}\n`, "utf8");
 }
 
 export class MessageReader {

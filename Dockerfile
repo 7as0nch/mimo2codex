@@ -30,6 +30,7 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 COPY web/ ./web/
 COPY plugins/ ./plugins/
+COPY mimoskill/ ./mimoskill/
 
 # 构建后端 + 前端
 RUN npm run build:all
@@ -68,6 +69,7 @@ ENV MIMO2CODEX_AUTH=on
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/plugins ./plugins
+COPY --from=builder /app/mimoskill ./mimoskill
 COPY package.json ./
 COPY .env.example ./.env.example
 

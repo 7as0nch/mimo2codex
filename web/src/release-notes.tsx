@@ -106,6 +106,15 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         },
         location: { en: "doc/mimo-computer-use-plugin.zh.md", zh: "doc/mimo-computer-use-plugin.zh.md" },
       },
+      {
+        kind: "fixed",
+        icon: <ToolOutlined />,
+        title: { en: "Computer Use plugin now talks to Codex", zh: "Computer Use 插件现在能与 Codex 通信" },
+        description: {
+          en: "The plugin's MCP server now uses the newline-delimited stdio wire format Codex expects (was Content-Length), and external adapter launch failures degrade gracefully instead of crashing the server.",
+          zh: "插件 MCP server 改用 Codex 期望的换行分隔 stdio 帧格式（原为 Content-Length），且外部 adapter 启动失败时优雅降级，不再拖垮 server。",
+        },
+      },
     ],
   },
 ];

@@ -18,6 +18,21 @@ export async function callExternalMcp(command, args, toolName, toolArgs, opts = 
   });
 
   const pending = new Map();
+
+  // spawn() emits 'error' asynchronously when the command can't be launched
+  // (ENOENT / EACCES — commandExists() narrows but can't eliminate the race,
+  // and indirect launchers like `uvx windows-mcp serve` can still fail). With
+  // no listener Node throws it as an uncaught exception, killing the whole
+  // mimo-computer-use server. Reject every pending request instead so the
+  // caller degrades to { ok: false } and we don't wait out the timeout.
+  let spawnError = null;
+  child.on("error", (err) => {
+    spawnError = err;
+    for (const [id, slot] of pending) {
+      pending.delete(id);
+      slot({ error: { message: `failed to launch ${command}: ${err.message}` } });
+    }
+  });
   const reader = new MessageReader((message) => {
     if (message && Object.prototype.hasOwnProperty.call(message, "id")) {
       const slot = pending.get(message.id);
@@ -33,6 +48,10 @@ export async function callExternalMcp(command, args, toolName, toolArgs, opts = 
     const id = nextId++;
     const payload = { jsonrpc: "2.0", id, method, params };
     return new Promise((resolve, reject) => {
+      if (spawnError) {
+        reject(new Error(`failed to launch ${command}: ${spawnError.message}`));
+        return;
+      }
       const timer = setTimeout(() => {
         pending.delete(id);
         reject(new Error(`external MCP request timed out: ${method}`));
