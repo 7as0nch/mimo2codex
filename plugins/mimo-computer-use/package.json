@@ -12,7 +12,8 @@
     "start": "node ./server/index.mjs",
     "test": "node --test ./server/test/*.test.mjs",
     "doctor": "node ./server/index.mjs --doctor",
-    "install-adapter": "node ./server/index.mjs --install-adapter"
+    "install-adapter": "node ./server/index.mjs --install-adapter",
+    "uninstall-adapter": "node ./server/index.mjs --uninstall-adapter"
   },
   "engines": {
     "node": ">=18"

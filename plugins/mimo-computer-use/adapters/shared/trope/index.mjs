@@ -45,7 +45,13 @@ export async function diagnose() {
 }
 
 export async function computerState(args = {}) {
-  return await call(args.window_id ? "get_window_state" : "list_windows", args, args.timeout_ms);
+  if (args.window_id) {
+    return await call("get_window_state", args, args.timeout_ms);
+  }
+  // Default to visible windows only so always-present hidden helper windows
+  // (e.g. WeChat's WxTrayIconMessageWindow tray-icon sink) don't clutter the
+  // list. The caller can still pass on_screen_only=false to see everything.
+  return await call("list_windows", { on_screen_only: true, ...args }, args.timeout_ms);
 }
 
 export async function computerClick(args = {}) {

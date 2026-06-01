@@ -470,6 +470,93 @@ export interface PluginSetResponse {
   plugin: BuiltinPluginInfo;
 }
 
+export interface AdapterInstallPlan {
+  ok?: boolean;
+  autoInstall?: boolean;
+  prerequisites?: string[];
+  steps?: string[];
+  message?: string;
+  docs?: string;
+  repo?: string;
+}
+
+export interface AdapterStatus {
+  adapterOk: boolean;
+  backend: string | null;
+  command: string[] | null;
+  message: string | null;
+  code: string | null;
+  installPlan: AdapterInstallPlan | null;
+  error?: string;
+}
+
+export interface AdapterStreamHandlers {
+  onStart?: () => void;
+  onLog?: (line: string, stream: "stdout" | "stderr") => void;
+  onDone?: (data: { ok: boolean; exitCode: number | null; configChanged?: boolean }) => void;
+  onError?: (message: string) => void;
+}
+
+// POST an adapter install/uninstall and consume the server's SSE stream. We use
+// fetch (not EventSource) so the request can be a POST carrying the admin
+// session cookie. Resolves when the stream ends; throws ApiError on a non-2xx.
+export async function streamPluginAdapterAction(
+  id: string,
+  action: "install" | "uninstall",
+  handlers: AdapterStreamHandlers,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/plugins/${encodeURIComponent(id)}/adapter/${action}`,
+    { method: "POST", credentials: "same-origin", headers: { Accept: "text/event-stream" }, signal }
+  );
+  if (!res.ok || !res.body) {
+    const text = res.body ? await res.text() : "";
+    let code: string | undefined;
+    let message = `HTTP ${res.status}`;
+    try {
+      const j = JSON.parse(text) as { error?: { code?: string; message?: string } };
+      code = j?.error?.code;
+      message = j?.error?.message ?? message;
+    } catch {
+      /* non-JSON body */
+    }
+    throw new ApiError(res.status, code, message);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      let event = "message";
+      let dataStr = "";
+      for (const ln of frame.split("\n")) {
+        if (ln.startsWith("event:")) event = ln.slice(6).trim();
+        else if (ln.startsWith("data:")) dataStr += ln.slice(5).trim();
+      }
+      let data: unknown = null;
+      try {
+        data = dataStr ? JSON.parse(dataStr) : null;
+      } catch {
+        data = dataStr;
+      }
+      const d = (data ?? {}) as Record<string, unknown>;
+      if (event === "start") handlers.onStart?.();
+      else if (event === "log")
+        handlers.onLog?.(String(d.line ?? ""), (d.stream as "stdout" | "stderr") ?? "stdout");
+      else if (event === "done")
+        handlers.onDone?.(d as { ok: boolean; exitCode: number | null; configChanged?: boolean });
+      else if (event === "error") handlers.onError?.(String(d.message ?? "error"));
+    }
+  }
+}
+
 export const api = {
   health: () => request<HealthResponse>("GET", "/health"),
   authMe: () => request<AuthMeResponse>("GET", "/auth/me"),
@@ -607,6 +694,8 @@ export const api = {
     request<{ plugin: BuiltinPluginInfo }>("GET", `/plugins/${encodeURIComponent(id)}`),
   setPluginEnabled: (id: string, enabled: boolean) =>
     request<PluginSetResponse>("PUT", `/plugins/${encodeURIComponent(id)}`, { enabled }),
+  pluginAdapter: (id: string) =>
+    request<{ adapter: AdapterStatus }>("GET", `/plugins/${encodeURIComponent(id)}/adapter`),
   settings: () => request<{ settings: Record<string, string> }>("GET", "/settings"),
   setSetting: (key: string, value: string) =>
     request<{ key: string; value: string }>("PUT", `/settings/${encodeURIComponent(key)}`, {

@@ -50,10 +50,14 @@ export function runCommand(command, args = [], opts = {}) {
     }, timeoutMs);
 
     child.stdout.on("data", (d) => {
-      stdout += d.toString("utf8");
+      const s = d.toString("utf8");
+      stdout += s;
+      opts.onData?.(s, "stdout");
     });
     child.stderr.on("data", (d) => {
-      stderr += d.toString("utf8");
+      const s = d.toString("utf8");
+      stderr += s;
+      opts.onData?.(s, "stderr");
     });
     child.on("error", (error) => {
       clearTimeout(timer);

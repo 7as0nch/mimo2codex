@@ -41,5 +41,32 @@
   "msg": {
     "enabled": "插件已启用，已热写 Codex 配置；重启 Codex 后生效。",
     "disabled": "插件已停用，已从 Codex 配置移除。"
+  },
+  "adapter": {
+    "title": "桌面后端：Trope CUA",
+    "desc": "真正操作桌面的开源后端（仅 macOS / Windows）。只发布源码，安装会自动克隆并本地编译，需要 git 与 .NET 10 SDK，耗时数分钟。",
+    "installed": "已安装",
+    "notInstalled": "未安装",
+    "detecting": "检测中…",
+    "backend": "后端",
+    "path": "可执行文件",
+    "prereqTitle": "先决条件",
+    "install": "下载并编译",
+    "reinstall": "重新安装",
+    "uninstall": "卸载",
+    "recheck": "重新检测",
+    "installModalTitle": "下载并编译 Trope CUA",
+    "uninstallModalTitle": "卸载 Trope CUA",
+    "running": "进行中…",
+    "installOkRestart": "安装完成。请重启 Codex 使其加载后端。",
+    "uninstallOk": "卸载完成。重启终端 / Codex 使 PATH 变更生效。",
+    "failed": "操作失败，请查看上面的日志。",
+    "configCleaned": "已从 Codex 配置移除 MIMO_COMPUTER_USE_TROPE_CMD。",
+    "configUpdated": "已把 Codex 配置指向新安装的可执行文件（backend=trope）。",
+    "confirmUninstall": "确定要卸载 Trope CUA 吗？将删除二进制并清理 PATH。",
+    "close": "关闭",
+    "cancel": "取消",
+    "notSelfContained": "构建产物是框架依赖版（需系统安装 .NET 10 桌面运行时），可能导致 Codex 报“需要 .NET 10”。建议重新安装以编译为 self-contained。",
+    "unsupported": "Trope CUA 仅支持 macOS 与 Windows。"
   }
 }

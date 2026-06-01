@@ -41,5 +41,32 @@
   "msg": {
     "enabled": "Plugin enabled and Codex config updated; restart Codex to load it.",
     "disabled": "Plugin disabled and removed from Codex config."
+  },
+  "adapter": {
+    "title": "Desktop backend: Trope CUA",
+    "desc": "The open-source backend that actually drives the desktop (macOS / Windows only). It ships as source, so install clones and builds locally — needs git and the .NET 10 SDK, and takes a few minutes.",
+    "installed": "Installed",
+    "notInstalled": "Not installed",
+    "detecting": "Detecting…",
+    "backend": "Backend",
+    "path": "Executable",
+    "prereqTitle": "Prerequisites",
+    "install": "Download & build",
+    "reinstall": "Reinstall",
+    "uninstall": "Uninstall",
+    "recheck": "Re-check",
+    "installModalTitle": "Download & build Trope CUA",
+    "uninstallModalTitle": "Uninstall Trope CUA",
+    "running": "Running…",
+    "installOkRestart": "Install complete. Restart Codex so it loads the backend.",
+    "uninstallOk": "Uninstalled. Restart your terminal / Codex so the PATH change takes effect.",
+    "failed": "Action failed — check the log above.",
+    "configCleaned": "Removed MIMO_COMPUTER_USE_TROPE_CMD from Codex config.",
+    "configUpdated": "Pointed Codex config at the freshly installed executable (backend=trope).",
+    "confirmUninstall": "Uninstall Trope CUA? This removes the binary and cleans your PATH.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "notSelfContained": "The build is framework-dependent (needs the .NET 10 Desktop Runtime installed) and may trigger a 'needs .NET 10' error in Codex. Reinstall to build self-contained.",
+    "unsupported": "Trope CUA supports macOS and Windows only."
   }
 }

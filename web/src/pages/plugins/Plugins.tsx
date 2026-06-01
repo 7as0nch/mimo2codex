@@ -1,18 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
   Button,
   Card,
   Descriptions,
+  Modal,
+  Popconfirm,
   Space,
+  Spin,
   Switch,
   Tag,
   Typography,
   message,
 } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
-import { api, type BuiltinPluginInfo } from "../../api/client";
+import {
+  DeleteOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import {
+  api,
+  streamPluginAdapterAction,
+  type AdapterStatus,
+  type BuiltinPluginInfo,
+} from "../../api/client";
 
 export function Plugins() {
   const { t } = useTranslation("plugins");
@@ -146,6 +158,8 @@ export function Plugins() {
               </Descriptions.Item>
             </Descriptions>
 
+            {plugin.category === "computer-use" && <AdapterPanel pluginId={plugin.id} />}
+
             <Alert
               type="success"
               showIcon
@@ -162,5 +176,225 @@ export function Plugins() {
         </Card>
       ))}
     </Space>
+  );
+}
+
+interface AdapterModalState {
+  action: "install" | "uninstall";
+  lines: string[];
+  running: boolean;
+  result: "ok" | "fail" | null;
+  configChanged?: boolean;
+}
+
+// Detect / download+build / uninstall the desktop backend (Trope CUA) for a
+// computer-use plugin. Probing runs the plugin's --doctor server-side; install
+// and uninstall stream the child process output live into a modal log.
+function AdapterPanel({ pluginId }: { pluginId: string }) {
+  const { t } = useTranslation("plugins");
+  const [status, setStatus] = useState<AdapterStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<AdapterModalState | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const probe = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api.pluginAdapter(pluginId);
+      setStatus(r.adapter);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [pluginId]);
+
+  useEffect(() => {
+    void probe();
+  }, [probe]);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [modal?.lines]);
+
+  async function run(action: "install" | "uninstall") {
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setModal({ action, lines: [], running: true, result: null });
+    try {
+      await streamPluginAdapterAction(
+        pluginId,
+        action,
+        {
+          onLog: (line) =>
+            setModal((m) => (m ? { ...m, lines: [...m.lines, line] } : m)),
+          onDone: (d) =>
+            setModal((m) =>
+              m ? { ...m, running: false, result: d.ok ? "ok" : "fail", configChanged: d.configChanged } : m
+            ),
+          onError: (msg) =>
+            setModal((m) =>
+              m ? { ...m, lines: [...m.lines, msg], running: false, result: "fail" } : m
+            ),
+        },
+        ac.signal
+      );
+    } catch (e) {
+      setModal((m) =>
+        m ? { ...m, lines: [...m.lines, (e as Error).message], running: false, result: "fail" } : m
+      );
+    } finally {
+      abortRef.current = null;
+      void probe();
+    }
+  }
+
+  function closeModal() {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setModal(null);
+    void probe();
+  }
+
+  const installed = status?.adapterOk === true;
+  const unsupported = status?.installPlan?.ok === false || status?.code === "unsupported_platform";
+  const prereqs = status?.installPlan?.prerequisites ?? [];
+  const exePath = status?.command?.[0] ?? null;
+
+  return (
+    <Card type="inner" size="small" title={t("adapter.title")}>
+      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+        <Typography.Text type="secondary">{t("adapter.desc")}</Typography.Text>
+
+        {loading ? (
+          <Space>
+            <Spin size="small" />
+            <span>{t("adapter.detecting")}</span>
+          </Space>
+        ) : (
+          <>
+            <Space wrap>
+              {installed ? (
+                <Tag color="green">{t("adapter.installed")}</Tag>
+              ) : (
+                <Tag color="red">{t("adapter.notInstalled")}</Tag>
+              )}
+              {status?.backend && (
+                <span>
+                  {t("adapter.backend")}: <code>{status.backend}</code>
+                </span>
+              )}
+            </Space>
+
+            {installed && exePath && (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {t("adapter.path")}: <code>{exePath}</code>
+              </Typography.Text>
+            )}
+
+            {!installed && prereqs.length > 0 && (
+              <Space wrap size={4}>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{t("adapter.prereqTitle")}:</span>
+                {prereqs.map((p) => (
+                  <Tag key={p}>{p}</Tag>
+                ))}
+              </Space>
+            )}
+
+            {unsupported && <Alert type="warning" showIcon message={t("adapter.unsupported")} />}
+
+            <Space wrap>
+              {installed ? (
+                <>
+                  <Button icon={<DownloadOutlined />} onClick={() => run("install")}>
+                    {t("adapter.reinstall")}
+                  </Button>
+                  <Popconfirm
+                    title={t("adapter.confirmUninstall")}
+                    okText={t("adapter.uninstall")}
+                    cancelText={t("adapter.cancel")}
+                    onConfirm={() => run("uninstall")}
+                  >
+                    <Button danger icon={<DeleteOutlined />}>
+                      {t("adapter.uninstall")}
+                    </Button>
+                  </Popconfirm>
+                </>
+              ) : (
+                <Button
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  disabled={unsupported}
+                  onClick={() => run("install")}
+                >
+                  {t("adapter.install")}
+                </Button>
+              )}
+              <Button icon={<ReloadOutlined />} onClick={() => void probe()}>
+                {t("adapter.recheck")}
+              </Button>
+            </Space>
+          </>
+        )}
+      </Space>
+
+      <Modal
+        open={modal !== null}
+        title={
+          modal?.action === "uninstall"
+            ? t("adapter.uninstallModalTitle")
+            : t("adapter.installModalTitle")
+        }
+        onCancel={closeModal}
+        maskClosable={false}
+        footer={
+          <Button onClick={closeModal} disabled={modal?.running}>
+            {modal?.running ? t("adapter.running") : t("adapter.close")}
+          </Button>
+        }
+        width={680}
+      >
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <div
+            ref={logRef}
+            style={{
+              maxHeight: 340,
+              overflow: "auto",
+              background: "rgba(0,0,0,0.04)",
+              borderRadius: 6,
+              padding: "8px 12px",
+              fontFamily: "monospace",
+              fontSize: 12,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+            }}
+          >
+            {(modal?.lines ?? []).join("\n") || (modal?.running ? t("adapter.running") : "")}
+          </div>
+          {modal?.result === "ok" && (
+            <Alert
+              type="success"
+              showIcon
+              message={
+                modal.action === "uninstall"
+                  ? t("adapter.uninstallOk")
+                  : t("adapter.installOkRestart")
+              }
+              description={
+                modal.configChanged
+                  ? modal.action === "uninstall"
+                    ? t("adapter.configCleaned")
+                    : t("adapter.configUpdated")
+                  : undefined
+              }
+            />
+          )}
+          {modal?.result === "fail" && <Alert type="error" showIcon message={t("adapter.failed")} />}
+        </Space>
+      </Modal>
+    </Card>
   );
 }

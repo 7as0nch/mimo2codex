@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Config } from "../config.js";
@@ -75,8 +76,13 @@ import {
   applyMcpServerEnabled,
   builtinComputerUsePlugin,
   configHasMcpServer,
+  configureTropeBackendInConfig,
+  pluginServerPath,
   readMcpPluginInstalled,
+  readPluginMcpEnvFromConfig,
   readQuickstartMarkdown,
+  runPluginDoctor,
+  stripTropeCmdFromConfig,
 } from "../codex/plugins.js";
 import {
   appendCodexHistory,
@@ -1113,6 +1119,107 @@ async function handleApi(ctx: RouteContext): Promise<void> {
       });
     }
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");
+  }
+
+  // Adapter (Trope CUA) management for the computer-use plugin:
+  //   GET  /admin/api/plugins/:id/adapter            → probe install state
+  //   POST /admin/api/plugins/:id/adapter/install    → SSE-streamed build
+  //   POST /admin/api/plugins/:id/adapter/uninstall  → SSE-streamed uninstall
+  const adapterRoute = pathname.match(
+    /^\/admin\/api\/plugins\/([^/]+)\/adapter(?:\/(install|uninstall))?$/
+  );
+  if (adapterRoute) {
+    const id = decodeURIComponent(adapterRoute[1]);
+    const action = adapterRoute[2] as "install" | "uninstall" | undefined;
+    if (id !== BUILTIN_COMPUTER_USE_PLUGIN_ID) {
+      return sendError(res, 404, "plugin_not_found", `plugin ${id} not found`);
+    }
+
+    if (!action && req.method === "GET") {
+      const adapter = await runPluginDoctor();
+      return sendJson(res, 200, { adapter });
+    }
+
+    if (action && req.method === "POST") {
+      if (!requireAdmin(ctx)) return;
+      const flag = action === "install" ? "--install-adapter" : "--uninstall-adapter";
+      const serverPath = pluginServerPath();
+      if (!existsSync(serverPath)) {
+        return sendError(res, 500, "plugin_missing", `plugin server not found at ${serverPath}`);
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-store");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders?.();
+      const writeEvent = (event: string, data: unknown): void => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      writeEvent("start", { action, ts: Date.now() });
+      // Install the adapter under mimo2codex's (possibly migrated) data dir.
+      const adapterEnv: Record<string, string> = cfg.dataDir
+        ? { MIMO2CODEX_ADAPTERS_DIR: join(cfg.dataDir, "adapters") }
+        : {};
+      const child = spawn(process.execPath, [serverPath, flag], {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, ...readPluginMcpEnvFromConfig(), ...adapterEnv },
+      });
+      // Kill the child build/uninstall if the browser aborts the request.
+      const onClose = (): void => {
+        if (!child.killed) child.kill("SIGTERM");
+      };
+      req.on("close", onClose);
+
+      // Capture the resolved executable path the installer prints so we can
+      // write it into Codex config on success (install only).
+      let installedExe: string | null = null;
+      const emit = (chunk: Buffer, stream: "stdout" | "stderr"): void => {
+        for (const line of chunk.toString("utf8").split(/\r?\n/)) {
+          if (line.length === 0) continue;
+          const m = /^INSTALLED_EXE=(.+)$/.exec(line);
+          if (m) {
+            installedExe = m[1].trim();
+            continue; // internal marker — don't surface in the UI log
+          }
+          writeEvent("log", { line, stream });
+        }
+      };
+      child.stdout.on("data", (d: Buffer) => emit(d, "stdout"));
+      child.stderr.on("data", (d: Buffer) => emit(d, "stderr"));
+      child.on("error", (err) => {
+        req.off("close", onClose);
+        writeEvent("error", { message: err.message });
+        res.end();
+      });
+      child.on("close", (code) => {
+        req.off("close", onClose);
+        const ok = code === 0;
+        // Sync Codex config to the result: point at the freshly built binary on
+        // install, or clean the CMD line on uninstall.
+        let configChanged = false;
+        try {
+          if (ok && action === "install" && installedExe) {
+            configChanged = configureTropeBackendInConfig(installedExe).changed;
+          } else if (ok && action === "uninstall") {
+            configChanged = stripTropeCmdFromConfig().changed;
+          }
+        } catch (err) {
+          writeEvent("log", {
+            line: `config update failed: ${(err as Error).message}`,
+            stream: "stderr",
+          });
+        }
+        log.info(`plugin adapter ${action} finished`, { exitCode: code, configChanged, installedExe });
+        writeEvent("done", { ok, exitCode: code, configChanged });
+        res.end();
+      });
+      return;
+    }
+
+    return sendError(res, 405, "method_not_allowed", action ? "use POST" : "use GET");
   }
 
   // GET /admin/api/provider-presets

@@ -3,7 +3,7 @@ import { stdin, stdout, stderr, argv, platform } from "node:process";
 import { MessageReader, writeMessage } from "./lib/framing.mjs";
 import { chooseAdapter } from "./lib/adapters.mjs";
 import { callTool, textResult, tools } from "./lib/tools.mjs";
-import { adapterInstallPlan, installAdapter } from "./lib/installers.mjs";
+import { adapterInstallPlan, installAdapter, uninstallAdapter } from "./lib/installers.mjs";
 
 const serverInfo = { name: "mimo-computer-use", version: "0.1.0" };
 
@@ -23,9 +23,31 @@ async function installAdapterCli() {
   stdout.write(`${plan.message}\n`);
   if (plan.command) stdout.write(`command: ${plan.command.join(" ")}\n`);
   stdout.write("progress: checking and installing adapter...\n");
-  const result = await installAdapter({ confirm_install: true, timeout_ms: 10 * 60 * 1000 });
+  const result = await installAdapter({
+    confirm_install: true,
+    force: true,
+    timeout_ms: 20 * 60 * 1000,
+    onProgress: (chunk) => stdout.write(chunk),
+  });
   stdout.write("progress: installer finished\n");
+  // Emit a machine-readable line so a parent (the admin server) can write the
+  // resolved executable path into Codex config without re-deriving it.
+  if (result.installedExe) stdout.write(`INSTALLED_EXE=${result.installedExe}\n`);
   stdout.write(JSON.stringify({ plan, result }, null, 2));
+  stdout.write("\n");
+  if (result.ok === false) process.exitCode = 1;
+}
+
+async function uninstallAdapterCli() {
+  stdout.write("mimo-computer-use adapter uninstaller\n");
+  stdout.write(`platform: ${platform}\n`);
+  stdout.write("progress: uninstalling adapter...\n");
+  const result = await uninstallAdapter({
+    timeout_ms: 5 * 60 * 1000,
+    onProgress: (chunk) => stdout.write(chunk),
+  });
+  stdout.write("progress: uninstaller finished\n");
+  stdout.write(JSON.stringify({ result }, null, 2));
   stdout.write("\n");
   if (result.ok === false) process.exitCode = 1;
 }
@@ -37,6 +59,11 @@ if (argv.includes("--doctor")) {
 
 if (argv.includes("--install-adapter")) {
   await installAdapterCli();
+  process.exit(process.exitCode ?? 0);
+}
+
+if (argv.includes("--uninstall-adapter")) {
+  await uninstallAdapterCli();
   process.exit(process.exitCode ?? 0);
 }
 

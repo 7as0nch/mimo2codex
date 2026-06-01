@@ -67,6 +67,33 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     highlights: [
       {
         kind: "new",
+        icon: <CloudDownloadOutlined />,
+        title: {
+          en: "Install / uninstall the desktop backend from Admin",
+          zh: "在后台一键安装 / 卸载桌面后端",
+        },
+        description: {
+          en: "The Plugins page now detects whether Trope CUA is installed and lets you download & build it (with a live log) or uninstall it — no manual .NET/git wrangling.",
+          zh: "插件页现在能探测 Trope CUA 是否已安装，并支持下载并编译（实时日志）或一键卸载——不用再手动折腾 .NET / git。",
+        },
+        location: { en: "Plugins → Desktop backend", zh: "插件 → 桌面后端" },
+        ctaLabel: { en: "Open", zh: "打开" },
+        ctaPath: "/plugins",
+      },
+      {
+        kind: "improved",
+        icon: <DesktopOutlined />,
+        title: {
+          en: "Cleaner window list by default",
+          zh: "默认更干净的窗口列表",
+        },
+        description: {
+          en: "computer_state now hides always-present hidden helper windows by default; pass on_screen_only=false to see everything.",
+          zh: "computer_state 默认隐藏常驻的隐藏辅助窗口；需要看全部时传 on_screen_only=false。",
+        },
+      },
+      {
+        kind: "new",
         icon: <DesktopOutlined />,
         title: { en: "MiMo Computer Use plugin", zh: "MiMo Computer Use 插件" },
         description: {
