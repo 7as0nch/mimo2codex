@@ -168,12 +168,13 @@ function parseSpec(raw: unknown, idx: number): GenericProviderSpec {
             typeof features.dropReasoningEffort === "boolean"
               ? features.dropReasoningEffort
               : undefined,
-          // enhanceErrorPreset 是 string 而非 boolean。当前仅承认 "sensenova" / "minimax"，
+          // enhanceErrorPreset 是 string 而非 boolean。当前承认 "sensenova" / "minimax" / "kimi"，
           // 未知值丢弃以避免无效配置进入运行时（generic.ts 的 enhanceError 会调
           // applyEnhanceErrorPreset，签名是 ProviderPresetId 联合类型）。
           enhanceErrorPreset:
             features.enhanceErrorPreset === "sensenova" ||
-            features.enhanceErrorPreset === "minimax"
+            features.enhanceErrorPreset === "minimax" ||
+            features.enhanceErrorPreset === "kimi"
               ? features.enhanceErrorPreset
               : undefined,
         }
@@ -278,7 +279,7 @@ function loadFromEnv(env: NodeJS.ProcessEnv): GenericProviderSpec[] {
       defaultModel,
       wireApi:
         env.GENERIC_WIRE_API === "responses" || env.GENERIC_WIRE_API === "chat"
-          ? (env.GENERIC_WIRE_API as "responses" | "chat")
+          ? (env.GIRESPONSES_WIRE_API as "responses" | "chat")
           : undefined,
       models: [],
       // minimax-compat: env-var 单实例下接 MiniMax 类严格上游时必开。
