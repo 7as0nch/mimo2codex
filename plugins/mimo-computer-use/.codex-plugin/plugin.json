@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "MiMo Computer Use",
     "shortDescription": "Let MiMo and compatible models operate the desktop through local MCP tools.",
-    "longDescription": "MiMo Computer Use exposes a small, conservative set of local desktop automation tools to Codex. It delegates actual desktop control to the separately installed open-source Trope CUA adapter, keeping this plugin isolated from the mimo2codex proxy runtime.",
+    "longDescription": "MiMo Computer Use exposes a small set of local desktop automation tools to Codex, driven entirely by Node (nut.js for mouse/keyboard/screenshot) — no external binary or compiler toolchain. Vision models act on the screenshot; text-only models act on OCR'd text targets. An optional Electron overlay draws a glowing cursor on the real desktop.",
     "developerName": "mimo2codex contributors",
     "category": "Productivity",
     "capabilities": [

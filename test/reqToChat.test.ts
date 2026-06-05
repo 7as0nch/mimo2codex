@@ -1089,7 +1089,7 @@ describe("reqToChat", () => {
     expect(tool).toBeDefined();
     expect(typeof tool!.content).toBe("string");
     expect(tool!.content).toContain("pet.png generated successfully.");
-    expect(tool!.content).toContain("[1 image attachment omitted from tool output");
+    expect(tool!.content).toContain("1 image omitted");
     expect(tool!.content).not.toContain("input_image");
     expect(tool!.content).not.toContain("data:image");
   });
@@ -2210,6 +2210,43 @@ describe("reqToChat — orphan tool message scrub (PR #10 regression)", () => {
       expect(assistant.tool_calls![0].id).toBe("c_broken");
       expect(assistant.tool_calls![0].function.arguments).toBe("{}");
       expect(tool.tool_call_id).toBe("c_broken");
+    });
+  });
+
+  describe("computer-use screenshot relocation", () => {
+    const withImageOutput = (model: string): ResponsesRequest => ({
+      model,
+      input: [
+        { type: "function_call", call_id: "c1", name: "computer_state", arguments: "{}" },
+        {
+          type: "function_call_output",
+          call_id: "c1",
+          output: [
+            { type: "output_text", text: "screen captured" },
+            { type: "input_image", image_url: "data:image/jpeg;base64,AAAA" },
+          ],
+        },
+      ] as unknown as ResponsesRequest["input"],
+    });
+
+    it("relocates a tool-output image into a following user message for vision models", () => {
+      const chat = reqToChat(withImageOutput("mimo-v2.5"));
+      const toolIdx = chat.messages.findIndex((m) => m.role === "tool");
+      expect(toolIdx).toBeGreaterThanOrEqual(0);
+      const next = chat.messages[toolIdx + 1];
+      expect(next.role).toBe("user");
+      expect(Array.isArray(next.content)).toBe(true);
+      const parts = next.content as Array<{ type: string; image_url?: { url: string } }>;
+      expect(parts.some((p) => p.type === "image_url" && p.image_url!.url.includes("base64,AAAA"))).toBe(true);
+    });
+
+    it("strips tool-output images (no relocation) for non-vision models", () => {
+      const chat = reqToChat(withImageOutput("mimo-v2.5-pro"));
+      // no relocated user message with image parts
+      expect(chat.messages.some((m) => m.role === "user" && Array.isArray(m.content))).toBe(false);
+      const tool = chat.messages.find((m) => m.role === "tool")!;
+      expect(typeof tool.content).toBe("string");
+      expect(tool.content as string).toContain("omitted");
     });
   });
 });

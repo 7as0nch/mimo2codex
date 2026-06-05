@@ -38,7 +38,9 @@ export function runCommand(command, args = [], opts = {}) {
       cwd: opts.cwd,
       env: { ...process.env, ...opts.env },
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      // npm/npx are .cmd shims on Windows and need a shell to launch; callers
+      // pass shell:true for those. Defaults to false for plain executables.
+      shell: opts.shell ?? false,
     });
     let stdout = "";
     let stderr = "";

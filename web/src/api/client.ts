@@ -499,7 +499,71 @@ export interface AdapterStatus {
   message: string | null;
   code: string | null;
   installPlan: AdapterInstallPlan | null;
+  /** nut.js (core backend) present. */
+  nutInstalled?: boolean;
+  /** Optional Electron glowing-cursor overlay runtime. */
+  overlay?: { available?: boolean; running?: boolean; reason?: string | null };
   error?: string;
+}
+
+export interface ComputerUseEvent {
+  ts: number;
+  type: string; // "state" | "click" | "type" | "key" | "scroll" | …
+  frameName?: string;
+  size?: { width: number; height: number };
+  scale?: number;
+  x?: number;
+  y?: number;
+  button?: string;
+  double?: boolean;
+  key?: string;
+  chars?: number;
+  direction?: string;
+}
+
+export function computerUseFrameUrl(name: string): string {
+  return `${BASE}/computer-use/frame/${encodeURIComponent(name)}`;
+}
+
+// Subscribe to the live computer-use action stream (SSE over fetch so the admin
+// cookie rides along and the caller can abort). Resolves when the stream ends.
+export async function streamComputerUse(
+  onEvent: (evt: ComputerUseEvent) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(`${BASE}/computer-use/stream`, {
+    method: "GET",
+    credentials: "same-origin",
+    headers: { Accept: "text/event-stream" },
+    signal,
+  });
+  if (!res.ok || !res.body) throw new ApiError(res.status, undefined, `HTTP ${res.status}`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      let event = "message";
+      let dataStr = "";
+      for (const ln of frame.split("\n")) {
+        if (ln.startsWith("event:")) event = ln.slice(6).trim();
+        else if (ln.startsWith("data:")) dataStr += ln.slice(5).trim();
+      }
+      if (event === "action" && dataStr) {
+        try {
+          onEvent(JSON.parse(dataStr) as ComputerUseEvent);
+        } catch {
+          /* skip malformed frame */
+        }
+      }
+    }
+  }
 }
 
 export interface AdapterStreamHandlers {
@@ -516,10 +580,12 @@ export async function streamPluginAdapterAction(
   id: string,
   action: "install" | "uninstall",
   handlers: AdapterStreamHandlers,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  opts?: { electron?: boolean }
 ): Promise<void> {
+  const query = action === "install" && opts?.electron ? "?electron=1" : "";
   const res = await fetch(
-    `${BASE}/plugins/${encodeURIComponent(id)}/adapter/${action}`,
+    `${BASE}/plugins/${encodeURIComponent(id)}/adapter/${action}${query}`,
     { method: "POST", credentials: "same-origin", headers: { Accept: "text/event-stream" }, signal }
   );
   if (!res.ok || !res.body) {

@@ -17,6 +17,7 @@ import {
   CodeOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  DesktopOutlined,
   FileTextOutlined,
   HistoryOutlined,
   ToolOutlined,
@@ -35,6 +36,7 @@ import { Models } from "./pages/Models";
 import { Logs } from "./pages/logs";
 import { Providers } from "./pages/providers";
 import { Plugins } from "./pages/plugins";
+import { ComputerUseMonitor } from "./pages/computer-use";
 import { CodexEnable } from "./pages/codex";
 import { Sessions } from "./pages/sessions";
 import { LoginPage } from "./pages/Login";
@@ -61,6 +63,7 @@ interface MenuLabels {
   sessions: string;
   providers: string;
   plugins: string;
+  computerUse: string;
   models: string;
   logs: string;
 }
@@ -71,6 +74,7 @@ const MENU: MenuEntry[] = [
   { path: "/sessions", key: "sessions", icon: <HistoryOutlined />, element: <Sessions /> },
   { path: "/providers", key: "providers", icon: <AppstoreOutlined />, element: <Providers /> },
   { path: "/plugins", key: "plugins", icon: <ToolOutlined />, element: <Plugins /> },
+  { path: "/computer-use", key: "computerUse", icon: <DesktopOutlined />, element: <ComputerUseMonitor /> },
   { path: "/models", key: "models", icon: <DatabaseOutlined />, element: <Models /> },
   { path: "/logs", key: "logs", icon: <FileTextOutlined />, element: <Logs /> },
 ];

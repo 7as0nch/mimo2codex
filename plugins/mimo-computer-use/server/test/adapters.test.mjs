@@ -2,39 +2,101 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { chooseAdapter, waitMs } from "../lib/adapters.mjs";
 import { tools } from "../lib/tools.mjs";
+import { adapterInstallPlan, nutInstalled } from "../lib/installers.mjs";
+import { matchTarget } from "../lib/ocr.mjs";
 import {
-  adapterInstallPlan,
-  checkPrerequisites,
-  assertRemovableTropeDir,
-} from "../lib/installers.mjs";
+  parseCombo,
+  computerClick,
+  computerType,
+  computerKey,
+  computerScroll,
+  diagnose,
+  __setNutForTests,
+} from "../lib/nutjs.mjs";
 
-test("chooseAdapter resolves to Trope CUA by default (auto) and on explicit trope", () => {
-  assert.equal(chooseAdapter({}).name, "trope-cua");
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "auto" }).name, "trope-cua");
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "trope" }).name, "trope-cua");
-  assert.equal(chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: "TROPE" }).name, "trope-cua");
-});
-
-test("chooseAdapter rejects retired/unknown backends instead of falling back", async () => {
-  for (const backend of ["peekaboo", "windows-mcp", "nonsense"]) {
-    const adapter = chooseAdapter({ MIMO_COMPUTER_USE_BACKEND: backend });
-    assert.equal(adapter.name, "unsupported");
-    const diag = await adapter.module.diagnose();
-    assert.equal(diag.ok, false);
-    assert.equal(diag.code, "unsupported_backend");
+// A fake nut.js so unit tests never move the real mouse. Key is a Proxy that
+// returns the property name for any key (always "defined"), which is enough for
+// parseCombo's lookups.
+function fakeNut() {
+  const calls = [];
+  const Key = new Proxy({}, { get: (_t, p) => p });
+  class Point {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+    }
   }
+  return {
+    calls,
+    Key,
+    Point,
+    Button: { LEFT: "left", RIGHT: "right", MIDDLE: "middle" },
+    straightTo: (target) => ({ straightTo: target }),
+    mouse: {
+      config: {},
+      async move(path) {
+        calls.push(["move", path]);
+      },
+      async click(button) {
+        calls.push(["click", button]);
+      },
+      async doubleClick(button) {
+        calls.push(["doubleClick", button]);
+      },
+      async scrollDown(n) {
+        calls.push(["scrollDown", n]);
+      },
+      async scrollUp(n) {
+        calls.push(["scrollUp", n]);
+      },
+      async scrollLeft(n) {
+        calls.push(["scrollLeft", n]);
+      },
+      async scrollRight(n) {
+        calls.push(["scrollRight", n]);
+      },
+    },
+    keyboard: {
+      config: {},
+      async type(text) {
+        calls.push(["type", text]);
+      },
+      async pressKey(...keys) {
+        calls.push(["pressKey", keys]);
+      },
+      async releaseKey(...keys) {
+        calls.push(["releaseKey", keys]);
+      },
+    },
+    screen: {
+      async width() {
+        return 1920;
+      },
+      async height() {
+        return 1080;
+      },
+    },
+    FileType: { PNG: "png" },
+  };
+}
+
+test("chooseAdapter resolves to the nut.js backend", () => {
+  assert.equal(chooseAdapter().name, "nutjs");
 });
 
 test("tool list exposes the stable computer-use surface plus installer", () => {
-  assert.deepEqual(tools.map((t) => t.name), [
-    "computer_state",
-    "computer_click",
-    "computer_type",
-    "computer_key",
-    "computer_scroll",
-    "computer_wait",
-    "computer_install_adapter",
-  ]);
+  assert.deepEqual(
+    tools.map((t) => t.name),
+    [
+      "computer_state",
+      "computer_click",
+      "computer_type",
+      "computer_key",
+      "computer_scroll",
+      "computer_wait",
+      "computer_install_adapter",
+    ]
+  );
 });
 
 test("wait is capped and returns a structured payload", async () => {
@@ -44,115 +106,116 @@ test("wait is capped and returns a structured payload", async () => {
   assert.equal(result.waited_ms, 1);
 });
 
-test("adapterInstallPlan builds Trope CUA from source on macOS/Windows", () => {
-  for (const platform of ["darwin", "win32"]) {
-    const plan = adapterInstallPlan({}, platform);
-    assert.equal(plan.backend, "trope-cua");
-    assert.equal(plan.ok, true);
-    assert.equal(plan.autoInstall, true);
-    assert.equal(plan.repo, "https://github.com/voctory/trope-cua");
-    assert.ok(Array.isArray(plan.steps) && plan.steps.length >= 2);
-    assert.deepEqual(plan.detects, ["trope-cua"]);
-  }
+test("adapterInstallPlan describes a pure-Node npm install (no clone/compile)", () => {
+  const plan = adapterInstallPlan();
+  assert.equal(plan.backend, "nutjs");
+  assert.equal(plan.ok, true);
+  assert.equal(plan.autoInstall, true);
+  assert.ok(Array.isArray(plan.steps) && plan.steps.length >= 1);
+  assert.ok(plan.prerequisites.some((p) => /npm/i.test(p)));
+  // No Trope/.NET/Xcode anywhere in the plan anymore.
+  assert.ok(!JSON.stringify(plan).match(/trope|\.NET|xcode/i));
 });
 
-test("adapterInstallPlan reports unsupported platform on Linux", () => {
-  const plan = adapterInstallPlan({}, "linux");
-  assert.equal(plan.ok, false);
-  assert.equal(plan.code, "unsupported_platform");
+test("nutInstalled returns a boolean without throwing", () => {
+  assert.equal(typeof nutInstalled(), "boolean");
 });
 
-test("install plan honors MIMO_COMPUTER_USE_TROPE_CMD for detection", () => {
-  const plan = adapterInstallPlan({ MIMO_COMPUTER_USE_TROPE_CMD: "/opt/trope" }, "darwin");
-  assert.deepEqual(plan.detects, ["/opt/trope"]);
+test("diagnose reports missing when nut.js is not importable", async () => {
+  __setNutForTests(null);
+  const d = await diagnose();
+  assert.equal(d.ok, false);
+  assert.equal(d.code, "adapter_missing");
 });
 
-// --- prerequisite detection (run BEFORE clone/build) --------------------------
+test("diagnose is ok when nut.js loads", async () => {
+  __setNutForTests(fakeNut());
+  const d = await diagnose();
+  assert.equal(d.ok, true);
+  assert.equal(d.backend, "nutjs");
+});
 
-// Fake probes so the check never touches the real machine.
-function fakeProbes({ present = [], sdks = [] } = {}) {
-  return {
-    commandExists: async (cmd) => present.includes(cmd),
-    runCommand: async (cmd, args) => {
-      if (cmd && args?.[0] === "--list-sdks") {
-        return { ok: sdks.length > 0, exitCode: 0, stdout: sdks.join("\n"), stderr: "" };
-      }
-      return { ok: false, exitCode: 1, stdout: "", stderr: "" };
-    },
-  };
-}
+// --- key combo parsing ------------------------------------------------------
 
-test("checkPrerequisites passes on Windows with git + a .NET 10 SDK", async () => {
-  const r = await checkPrerequisites({
-    env: {},
-    platform: "win32",
-    ...fakeProbes({ present: ["git", "dotnet"], sdks: ["10.0.201 [C:\\Program Files\\dotnet\\sdk]"] }),
-  });
+test("parseCombo splits modifiers from the final key", () => {
+  const Key = new Proxy({}, { get: (_t, p) => p });
+  assert.deepEqual(parseCombo("Ctrl+C", Key), { mods: ["LeftControl"], key: "C" });
+  assert.deepEqual(parseCombo("Cmd+Shift+P", Key), { mods: ["LeftSuper", "LeftShift"], key: "P" });
+  assert.deepEqual(parseCombo("Alt+Tab", Key), { mods: ["LeftAlt"], key: "Tab" });
+  assert.deepEqual(parseCombo("Enter", Key), { mods: [], key: "Enter" });
+  assert.deepEqual(parseCombo("F5", Key), { mods: [], key: "F5" });
+});
+
+test("parseCombo yields no key for an unrecognized token", () => {
+  const Key = new Proxy({}, { get: (_t, p) => p });
+  assert.deepEqual(parseCombo("f99", Key), { mods: [], key: null });
+});
+
+// --- actions via the fake backend -------------------------------------------
+
+test("computerClick moves then clicks at the given coordinates", async () => {
+  const nut = fakeNut();
+  __setNutForTests(nut);
+  const r = await computerClick({ x: 100, y: 200 });
   assert.equal(r.ok, true);
-  assert.equal(r.missing.length, 0);
+  assert.equal(r.x, 100);
+  assert.equal(r.y, 200);
+  assert.equal(r.via, "coordinates");
+  assert.deepEqual(nut.calls.map((c) => c[0]), ["move", "click"]);
+  const moved = nut.calls[0][1].straightTo;
+  assert.equal(moved.x, 100);
+  assert.equal(moved.y, 200);
 });
 
-test("checkPrerequisites flags missing git", async () => {
-  const r = await checkPrerequisites({
-    env: {},
-    platform: "win32",
-    ...fakeProbes({ present: ["dotnet"], sdks: ["10.0.201 [x]"] }),
-  });
+test("computerClick supports right + double click", async () => {
+  const nut = fakeNut();
+  __setNutForTests(nut);
+  await computerClick({ x: 1, y: 1, button: "right", double: true });
+  assert.deepEqual(nut.calls.map((c) => c[0]), ["move", "doubleClick"]);
+  assert.equal(nut.calls[1][1], "right");
+});
+
+test("computerClick errors with no coordinates and no target", async () => {
+  __setNutForTests(fakeNut());
+  const r = await computerClick({});
   assert.equal(r.ok, false);
-  assert.ok(r.missing.some((m) => m.name === "git"));
+  assert.equal(r.code, "no_target");
 });
 
-test("checkPrerequisites flags a totally missing .NET SDK on Windows", async () => {
-  const r = await checkPrerequisites({
-    env: {},
-    platform: "win32",
-    ...fakeProbes({ present: ["git"], sdks: [] }),
-  });
-  assert.equal(r.ok, false);
-  assert.ok(r.missing.some((m) => /\.NET 10 SDK/.test(m.name)));
-});
-
-test("checkPrerequisites flags a wrong .NET major (8 installed, 10 needed)", async () => {
-  const r = await checkPrerequisites({
-    env: {},
-    platform: "win32",
-    ...fakeProbes({ present: ["git", "dotnet"], sdks: ["8.0.100 [x]", "9.0.100 [x]"] }),
-  });
-  assert.equal(r.ok, false);
-  const dn = r.missing.find((m) => /\.NET 10 SDK/.test(m.name));
-  assert.ok(dn && /8|9/.test(dn.detail));
-});
-
-test("checkPrerequisites on macOS only requires git (no .NET check)", async () => {
-  const r = await checkPrerequisites({
-    env: {},
-    platform: "darwin",
-    ...fakeProbes({ present: ["git"], sdks: [] }),
-  });
+test("computerType types the text", async () => {
+  const nut = fakeNut();
+  __setNutForTests(nut);
+  const r = await computerType({ text: "hello" });
   assert.equal(r.ok, true);
+  assert.deepEqual(nut.calls.at(-1), ["type", "hello"]);
 });
 
-// --- uninstall safety guard ---------------------------------------------------
-
-test("assertRemovableTropeDir refuses paths outside Trope storage (protects .NET)", () => {
-  const env = { LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local", MIMO2CODEX_ADAPTERS_DIR: "C:\\Users\\u\\.mimo2codex\\adapters" };
-  // System / user .NET locations must NEVER be removable.
-  for (const danger of [
-    "C:\\Program Files\\dotnet",
-    "C:\\Users\\u\\.dotnet",
-    "C:\\Users\\u\\AppData\\Local\\Microsoft\\dotnet",
-  ]) {
-    assert.throws(() => assertRemovableTropeDir(danger, env, "win32"), /refusing to remove/);
-  }
+test("computerKey presses and releases the parsed sequence", async () => {
+  const nut = fakeNut();
+  __setNutForTests(nut);
+  const r = await computerKey({ key: "Ctrl+C" });
+  assert.equal(r.ok, true);
+  assert.deepEqual(nut.calls[0], ["pressKey", ["LeftControl", "C"]]);
+  assert.deepEqual(nut.calls[1], ["releaseKey", ["C", "LeftControl"]]);
 });
 
-test("assertRemovableTropeDir allows the managed Trope dirs", () => {
-  const env = { LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local", MIMO2CODEX_ADAPTERS_DIR: "C:\\Users\\u\\.mimo2codex\\adapters" };
-  for (const ok of [
-    "C:\\Users\\u\\.mimo2codex\\adapters\\trope-cua",
-    "C:\\Users\\u\\.mimo2codex\\adapters\\trope-cua-bin",
-    "C:\\Users\\u\\AppData\\Local\\Programs\\TropeCUA",
-  ]) {
-    assert.doesNotThrow(() => assertRemovableTropeDir(ok, env, "win32"));
-  }
+test("computerScroll scrolls in the requested direction", async () => {
+  const nut = fakeNut();
+  __setNutForTests(nut);
+  await computerScroll({ direction: "up", amount: 5 });
+  assert.deepEqual(nut.calls.at(-1), ["scrollUp", 5]);
+});
+
+// --- OCR target matching ----------------------------------------------------
+
+test("matchTarget prefers exact, then substring, then word-set", () => {
+  const targets = [
+    { text: "Submit", cx: 10, cy: 10 },
+    { text: "Submit form now", cx: 20, cy: 20 },
+    { text: "Cancel", cx: 30, cy: 30 },
+  ];
+  assert.equal(matchTarget(targets, "Submit").cx, 10); // exact
+  assert.equal(matchTarget(targets, "cancel").text, "Cancel"); // case-insensitive exact
+  assert.equal(matchTarget(targets, "now").text, "Submit form now"); // substring
+  assert.equal(matchTarget(targets, "missing"), null);
 });

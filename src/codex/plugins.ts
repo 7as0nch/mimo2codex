@@ -32,7 +32,7 @@ export function builtinComputerUsePlugin(): BuiltinPluginInfo {
     id: BUILTIN_COMPUTER_USE_PLUGIN_ID,
     name: "MiMo Computer Use",
     description:
-      "Local MCP computer-use tools for MiMo, DeepSeek, and OpenAI-compatible models via the cross-platform Trope CUA adapter.",
+      "Local MCP computer-use tools for MiMo, DeepSeek, and OpenAI-compatible models — pure Node (nut.js), no external binary. Vision models act on the screenshot; text-only models act on OCR'd targets. Optional Electron overlay draws a glowing cursor on the desktop.",
     category: "computer-use",
     mcpServerName: BUILTIN_COMPUTER_USE_PLUGIN_ID,
     pluginRoot: root,
@@ -43,13 +43,15 @@ export function builtinComputerUsePlugin(): BuiltinPluginInfo {
 
 export function renderMcpServerBlock(plugin = builtinComputerUsePlugin()): string {
   const serverPath = toTomlString(plugin.serverPath);
+  // MIMO2CODEX_ADMIN_URL lets the MCP server (launched by Codex, not us) POST
+  // its actions back to this proxy so the admin "Monitor" page can show them.
   return `[mcp_servers.${plugin.mcpServerName}]
 command = "node"
 args = [${serverPath}]
 startup_timeout_sec = 20
 
 [mcp_servers.${plugin.mcpServerName}.env]
-MIMO_COMPUTER_USE_BACKEND = "auto"`;
+MIMO2CODEX_ADMIN_URL = "http://127.0.0.1:8788"`;
 }
 
 export function configHasMcpServer(config: string | null, serverName: string): boolean {
@@ -116,10 +118,9 @@ export function pluginServerPath(): string {
 }
 
 // Read the plugin's `[mcp_servers.<id>.env]` block from config.toml so that
-// doctor/install/uninstall child processes run with the SAME backend selection
-// (e.g. MIMO_COMPUTER_USE_BACKEND=trope + MIMO_COMPUTER_USE_TROPE_CMD) that
-// Codex itself uses — otherwise detection would default to `auto` and report
-// the wrong adapter. Only simple `KEY = "value"` lines are honored.
+// doctor/install/uninstall child processes run with the SAME environment
+// (e.g. MIMO2CODEX_ADMIN_URL / MIMO2CODEX_COMPUTER_USE_DIR) that Codex passes
+// the MCP server. Only simple `KEY = "value"` lines are honored.
 export function readPluginMcpEnvFromConfig(): Record<string, string> {
   const text = readConfigTomlIfExists();
   if (!text) return {};
@@ -149,13 +150,15 @@ export interface AdapterDoctor {
   message: string | null;
   code: string | null;
   installPlan: unknown;
+  nutInstalled?: boolean;
+  overlay?: { available?: boolean; running?: boolean; reason?: string | null };
   raw?: unknown;
   error?: string;
 }
 
 // Run the plugin's own `--doctor` in a child node process and parse its JSON.
-// This is how we detect whether the desktop backend (Trope CUA) is installed
-// without duplicating the adapter-detection logic in the proxy.
+// This is how we detect whether the desktop backend (nut.js) and the optional
+// Electron overlay are installed without duplicating that logic in the proxy.
 export function runPluginDoctor(timeoutMs = 15_000): Promise<AdapterDoctor> {
   const serverPath = pluginServerPath();
   return new Promise((resolve) => {
@@ -205,6 +208,8 @@ export function runPluginDoctor(timeoutMs = 15_000): Promise<AdapterDoctor> {
           adapter?: string;
           diagnosis?: { ok?: boolean; backend?: string; command?: string[]; message?: string; code?: string };
           installPlan?: unknown;
+          nutInstalled?: boolean;
+          overlay?: { available?: boolean; running?: boolean; reason?: string | null };
         };
         const dx = json.diagnosis ?? {};
         finish({
@@ -214,6 +219,8 @@ export function runPluginDoctor(timeoutMs = 15_000): Promise<AdapterDoctor> {
           message: dx.message ?? null,
           code: dx.code ?? null,
           installPlan: json.installPlan ?? null,
+          nutInstalled: json.nutInstalled,
+          overlay: json.overlay,
           raw: json,
         });
       } catch {
@@ -229,72 +236,6 @@ export function runPluginDoctor(timeoutMs = 15_000): Promise<AdapterDoctor> {
       }
     });
   });
-}
-
-// After a successful install, point Codex at the freshly built binary: ensure
-// the plugin's [mcp_servers.*.env] block selects the trope backend and uses the
-// given executable. No-op when the plugin block doesn't exist yet (plugin not
-// enabled). Backs up before writing.
-export function configureTropeBackendInConfig(exePath: string): { path: string; changed: boolean } {
-  const filePath = configTomlPath();
-  const before = readConfigTomlIfExists();
-  if (before === null) return { path: filePath, changed: false };
-  const plugin = builtinComputerUsePlugin();
-  const envHeaderNorm = `[mcp_servers.${plugin.mcpServerName}.env]`.replace(/\s+/g, "");
-  const desired: Record<string, string> = {
-    MIMO_COMPUTER_USE_BACKEND: "trope",
-    MIMO_COMPUTER_USE_TROPE_CMD: exePath,
-    MIMO_COMPUTER_USE_TROPE_ARGS: "mcp",
-  };
-  const desiredLines = Object.entries(desired).map(([k, v]) => `${k} = ${JSON.stringify(v)}`);
-
-  const lines = before.replace(/\r\n/g, "\n").split("\n");
-  const headerIdx = lines.findIndex((l) => l.trim().replace(/\s+/g, "") === envHeaderNorm);
-
-  let after: string;
-  if (headerIdx === -1) {
-    // No env block — append one only if the server block exists.
-    const serverHeaderNorm = `[mcp_servers.${plugin.mcpServerName}]`.replace(/\s+/g, "");
-    if (!lines.some((l) => l.trim().replace(/\s+/g, "") === serverHeaderNorm)) {
-      return { path: filePath, changed: false };
-    }
-    after = `${before.replace(/\s*$/, "")}\n\n[mcp_servers.${plugin.mcpServerName}.env]\n${desiredLines.join("\n")}\n`;
-  } else {
-    // Replace the desired keys inside the existing block (keep other keys).
-    let end = headerIdx + 1;
-    const kept: string[] = [];
-    for (; end < lines.length; end++) {
-      if (/^\s*\[/.test(lines[end])) break;
-      const key = /^([A-Za-z0-9_]+)\s*=/.exec(lines[end].trim())?.[1];
-      if (key && key in desired) continue;
-      kept.push(lines[end]);
-    }
-    while (kept.length && kept[kept.length - 1].trim() === "") kept.pop();
-    const block = [...kept, ...desiredLines];
-    after = [...lines.slice(0, headerIdx + 1), ...block, ...lines.slice(end)].join("\n");
-  }
-
-  if (after === before) return { path: filePath, changed: false };
-  backupFile(filePath, Date.now());
-  atomicWrite(filePath, after);
-  return { path: filePath, changed: true };
-}
-
-// On full uninstall, strip the hand-added MIMO_COMPUTER_USE_TROPE_CMD line from
-// the plugin's [mcp_servers.*.env] block so config.toml returns to a clean
-// state (backend etc. are left intact). Backs up before writing.
-export function stripTropeCmdFromConfig(): { path: string; changed: boolean } {
-  const filePath = configTomlPath();
-  const before = readConfigTomlIfExists();
-  if (before === null) return { path: filePath, changed: false };
-  const after = before.replace(
-    /^[^\S\r\n]*MIMO_COMPUTER_USE_TROPE_CMD[^\S\r\n]*=.*\r?\n?/gm,
-    ""
-  );
-  if (after === before) return { path: filePath, changed: false };
-  backupFile(filePath, Date.now());
-  atomicWrite(filePath, after);
-  return { path: filePath, changed: true };
 }
 
 function removeMcpServerBlock(text: string, serverName: string): string {

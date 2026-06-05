@@ -5,8 +5,8 @@
   "yes": "是",
   "no": "否",
   "notice": {
-    "title": "首次使用会先检测 adapter，缺失时可直接安装",
-    "desc": "启用开关会把内置 MCP server 写入 Codex 配置。真正操作桌面前，插件会检测跨平台后端 Trope CUA；缺失时可运行 npm run install-adapter，或让模型调用 computer_install_adapter 并显示安装进度。"
+    "title": "纯 Node 实现，无需编译工具链",
+    "desc": "启用开关会把内置 MCP server 写入 Codex 配置。桌面控制由 nut.js（鼠标/键盘/截图）驱动，npm install 即可，无需 git/.NET/Xcode。视觉模型看截图操作，纯文本模型靠 OCR 文字坐标操作。可选安装 Electron，在真实桌面显示发光光标。"
   },
   "category": {
     "computer-use": "Computer Use"
@@ -35,38 +35,50 @@
   },
   "usage": {
     "title": "启用后怎么用",
-    "desc": "重启 Codex CLI / Desktop 后，模型会看到 computer_state、computer_click、computer_type、computer_key、computer_scroll、computer_wait、computer_install_adapter 这些 MCP 工具。",
-    "prompt": "请调用 computer_state 看看当前屏幕状态，并告诉我可用的下一步操作。"
+    "desc": "重启 Codex CLI / Desktop 后，模型会看到 computer_state、computer_click、computer_type、computer_key、computer_scroll、computer_wait、computer_install_adapter 这些 MCP 工具。可在「Computer Use 监看」页实时查看 AI 的操作。",
+    "prompt": "请调用 computer_state 看看当前屏幕，然后帮我点击/操作。"
   },
   "msg": {
     "enabled": "插件已启用，已热写 Codex 配置；重启 Codex 后生效。",
     "disabled": "插件已停用，已从 Codex 配置移除。"
   },
+  "enableLabel": "启用",
+  "openMonitor": "打开 Computer Use 监看页",
+  "learnMore": "在 docweb 查看插件介绍",
+  "contribute": {
+    "title": "欢迎投稿插件适配",
+    "desc": "做了好玩的 computer-use / MCP 插件适配？投稿到 docweb，被收录后就会出现在这里。",
+    "cta": "去投稿"
+  },
   "adapter": {
-    "title": "桌面后端：Trope CUA",
-    "desc": "真正操作桌面的开源后端（仅 macOS / Windows）。只发布源码，安装会自动克隆并本地编译，需要 git 与 .NET 10 SDK，耗时数分钟。",
-    "installed": "已安装",
-    "notInstalled": "未安装",
+    "title": "桌面控制依赖（纯 Node）",
+    "desc": "nut.js 是核心后端（鼠标/键盘/截图，预编译、免工具链）。Electron 是可选项，用于在真实桌面显示发光光标。",
+    "installed": "nut.js 已就绪",
+    "notInstalled": "nut.js 未安装",
     "detecting": "检测中…",
     "backend": "后端",
-    "path": "可执行文件",
+    "path": "命令",
     "prereqTitle": "先决条件",
-    "install": "下载并编译",
+    "install": "安装依赖",
     "reinstall": "重新安装",
-    "uninstall": "卸载",
     "recheck": "重新检测",
-    "installModalTitle": "下载并编译 Trope CUA",
-    "uninstallModalTitle": "卸载 Trope CUA",
+    "withElectronLabel": "同时下载发光光标运行时（Electron，体积较大）",
+    "installModalTitle": "安装依赖（npm install）",
+    "uninstallModalTitle": "移除发光光标运行时",
     "running": "进行中…",
-    "installOkRestart": "安装完成。请重启 Codex 使其加载后端。",
-    "uninstallOk": "卸载完成。重启终端 / Codex 使 PATH 变更生效。",
+    "installOkRestart": "安装完成。请重启 Codex 使其重新加载插件。",
+    "uninstallOk": "已移除 Electron 发光光标（nut.js 保留，基础操作仍可用）。重启 Codex 生效。",
     "failed": "操作失败，请查看上面的日志。",
-    "configCleaned": "已从 Codex 配置移除 MIMO_COMPUTER_USE_TROPE_CMD。",
-    "configUpdated": "已把 Codex 配置指向新安装的可执行文件（backend=trope）。",
-    "confirmUninstall": "确定要卸载 Trope CUA 吗？将删除二进制并清理 PATH。",
     "close": "关闭",
     "cancel": "取消",
-    "notSelfContained": "构建产物是框架依赖版（需系统安装 .NET 10 桌面运行时），可能导致 Codex 报“需要 .NET 10”。建议重新安装以编译为 self-contained。",
-    "unsupported": "Trope CUA 仅支持 macOS 与 Windows。"
+    "unsupported": "当前平台不受支持（nut.js 支持 macOS 与 Windows）。",
+    "overlayTitle": "发光光标（Electron）",
+    "overlayInstalled": "已安装",
+    "overlayNotInstalled": "未安装",
+    "overlayDesc": "AI 操作时在真实桌面显示发光青色光标与点击波纹，并提供「停止 AI 控制」按钮。不安装也能用，只是桌面上看不到发光光标（仍可在监看页查看）。",
+    "downloadElectron": "下载发光光标(Electron)",
+    "removeElectron": "移除发光光标",
+    "confirmRemoveElectron": "确定移除 Electron 发光光标运行时吗？nut.js 会保留。",
+    "macPermission": "macOS：安装后请在「系统设置 → 隐私与安全性」给宿主应用（终端 / Codex）授予「辅助功能」与「屏幕录制」权限。"
   }
 }

@@ -14,7 +14,7 @@
 // so the modal stays scannable. We keep ONLY the latest version's entry.
 
 import type { ReactNode } from "react";
-import { BugOutlined, WindowsOutlined } from "@ant-design/icons";
+import { BugOutlined, WindowsOutlined, DesktopOutlined, ThunderboltOutlined, AppstoreOutlined } from "@ant-design/icons";
 
 export interface BilingualText {
   en: string;
@@ -52,14 +52,59 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: "0.5.23",
     date: "2026-06-03",
     title: {
-      en: "Windows CLI launcher + provider-config fix",
-      zh: "Windows CLI 启动器 + provider 配置修复",
+      en: "Computer Use, now pure Node (no Trope CUA)",
+      zh: "Computer Use 改为纯 Node（不再依赖 Trope CUA）",
     },
     summary: {
-      en: "Run Codex CLI in an isolated profile; plus a fix for the admin UI going 404 after saving a provider with a duplicate shortcut.",
-      zh: "用隔离配置跑 Codex CLI；并修复了保存重复 shortcut 的 provider 后后台变 404 的问题。",
+      en: "The computer-use plugin is rewritten on nut.js — just npm install, no compiler. Optional glowing on-desktop cursor and a live Monitor page. Plus a Windows CLI launcher and a provider-config fix.",
+      zh: "computer-use 插件用 nut.js 重写——npm install 即可，无需编译。可选真实桌面发光光标与实时监看页。另含 Windows CLI 启动器与 provider 配置修复。",
     },
     highlights: [
+      {
+        kind: "new",
+        icon: <DesktopOutlined />,
+        title: {
+          en: "Computer Use rewritten in pure Node (nut.js)",
+          zh: "Computer Use 插件改为纯 Node（nut.js）",
+        },
+        description: {
+          en: "No more Trope CUA / Xcode / .NET build. nut.js drives mouse, keyboard and screenshots. Vision models act on the screenshot; text-only models act on OCR'd targets with click coordinates.",
+          zh: "不再需要 Trope CUA / Xcode / .NET 编译。nut.js 直接操作鼠标、键盘与截图。视觉模型看截图操作，纯文本模型靠 OCR 文字坐标操作。",
+        },
+        location: { en: "Plugins → MiMo Computer Use", zh: "插件 → MiMo Computer Use" },
+        ctaLabel: { en: "Open Plugins", zh: "打开插件页" },
+        ctaPath: "/plugins",
+      },
+      {
+        kind: "new",
+        icon: <ThunderboltOutlined />,
+        title: {
+          en: "Glowing desktop cursor + live Monitor",
+          zh: "桌面发光光标 + 实时监看页",
+        },
+        description: {
+          en: "Optionally install Electron for a glowing cursor + click ripples on the real desktop (with a Stop/Resume control). The new Computer Use Monitor page streams the AI's actions live — no Electron required.",
+          zh: "可选安装 Electron，在真实桌面显示发光光标 + 点击波纹（含停止/恢复按钮）。新的「Computer Use 监看」页实时显示 AI 操作——不装 Electron 也能看。",
+        },
+        location: { en: "Computer Use Monitor (left nav)", zh: "左侧导航 → Computer Use 监看" },
+        ctaLabel: { en: "Open Monitor", zh: "打开监看页" },
+        ctaPath: "/computer-use",
+      },
+      {
+        kind: "improved",
+        icon: <AppstoreOutlined />,
+        title: {
+          en: "Plugins page is now a card marketplace",
+          zh: "插件页改成卡片市场",
+        },
+        description: {
+          en: "Browse plugins as cards and click one for a detail drawer (enable, install deps, open the Monitor). A \"Contribute a plugin\" card links to docweb, which also has a new Plugins page listing the built-in plugin with its version.",
+          zh: "插件以卡片网格浏览，点开右侧详情抽屉（启用、安装依赖、打开监看页）。新增「欢迎投稿插件」卡链接到 docweb——docweb 也有了新的插件页，列出自带插件及其版本号。",
+        },
+        location: { en: "Plugins (left nav)", zh: "左侧导航 → 插件" },
+        ctaLabel: { en: "Open Plugins", zh: "打开插件页" },
+        ctaPath: "/plugins",
+      },
       {
         kind: "new",
         icon: <WindowsOutlined />,

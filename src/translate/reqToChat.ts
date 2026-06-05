@@ -155,7 +155,10 @@ function partsToChatContent(
 // most third-party providers, and DeepSeek explicitly 400s with
 // "unknown variant `input_image`, expected `text`"). So we always textify and
 // replace images with a one-line placeholder.
-function toolOutputToString(output: ResponsesFunctionCallOutputItem["output"]): string {
+function toolOutputToString(
+  output: ResponsesFunctionCallOutputItem["output"],
+  opts: { relocating?: boolean } = {}
+): string {
   if (typeof output === "string") return output;
   if (!Array.isArray(output)) {
     try {
@@ -165,26 +168,44 @@ function toolOutputToString(output: ResponsesFunctionCallOutputItem["output"]): 
     }
   }
   const chunks: string[] = [];
-  let droppedImages = 0;
+  let imageCount = 0;
   for (const p of output) {
     if (!p || typeof p !== "object") continue;
     if (p.type === "input_text" || p.type === "output_text") {
       const text = typeof p.text === "string" ? p.text : "";
       if (text.length > 0) chunks.push(text);
     } else if (p.type === "input_image") {
-      droppedImages++;
+      imageCount++;
     }
     // input_file and unknown parts are silently dropped.
   }
-  if (droppedImages > 0) {
-    log.warn(
-      `dropped ${droppedImages} image part(s) from tool output — Chat Completions tool messages cannot carry images`
-    );
+  // The tool message itself can't carry images. The caller decides whether the
+  // image is relocated into a following user message (vision models) or truly
+  // dropped (non-vision), and logs accordingly — so we only leave a short note.
+  if (imageCount > 0) {
+    const plural = imageCount > 1 ? "s" : "";
     chunks.push(
-      `[${droppedImages} image attachment${droppedImages > 1 ? "s" : ""} omitted from tool output: this chat backend cannot ingest images in tool results.]`
+      opts.relocating
+        ? `[${imageCount} screenshot${plural} provided in the next message.]`
+        : `[${imageCount} image${plural} omitted — this model can't see images in tool results. Use the OCR \`targets\`, or switch to a vision model (mimo-v2.5 / mimo-v2-omni).]`
     );
   }
   return chunks.join("");
+}
+
+// Pull image parts out of a function_call_output. Chat `tool` messages can't
+// carry images, so for vision providers we relocate these into a follow-up
+// `user` message (see the function_call_output case). This is what lets a
+// vision model actually SEE a computer_use screenshot returned by a tool.
+function extractToolOutputImages(
+  output: ResponsesFunctionCallOutputItem["output"]
+): ResponsesContentPart[] {
+  if (!Array.isArray(output)) return [];
+  return output.filter(
+    (p): p is ResponsesContentPart =>
+      !!p && typeof p === "object" && (p as { type?: string }).type === "input_image" &&
+      typeof (p as { image_url?: unknown }).image_url === "string"
+  );
 }
 
 function messageItemToChat(
@@ -800,11 +821,32 @@ function inputItemsToMessages(
       }
       case "function_call_output": {
         flushAssistant(out, state);
+        // Chat `tool` messages can't carry images. For a vision-capable model,
+        // relocate any image the tool returned (e.g. a computer_use screenshot)
+        // into a follow-up `user` message so the model actually sees it. For
+        // non-vision models the image is dropped with a hint.
+        const imgs = extractToolOutputImages(item.output);
+        const relocating = ctx.supportsImages && imgs.length > 0;
         out.push({
           role: "tool",
           tool_call_id: item.call_id,
-          content: toolOutputToString(item.output),
+          content: toolOutputToString(item.output, { relocating }),
         });
+        if (relocating) {
+          const labeled: ResponsesContentPart[] = [
+            { type: "input_text", text: "Screenshot returned by the tool call above:" } as ResponsesContentPart,
+            ...imgs,
+          ];
+          out.push({ role: "user", content: partsToChatContent(labeled, ctx) });
+          log.info(
+            `computer-use: relocated ${imgs.length} screenshot(s) into a user message for vision model "${ctx.model}"`
+          );
+        } else if (imgs.length > 0) {
+          log.warn(
+            `computer-use: model "${ctx.model}" is NOT vision-capable — dropped ${imgs.length} screenshot(s) from tool output. ` +
+              `Set the model to mimo-v2.5 or mimo-v2-omni so the agent can see the screen, or rely on OCR text targets.`
+          );
+        }
         break;
       }
     }

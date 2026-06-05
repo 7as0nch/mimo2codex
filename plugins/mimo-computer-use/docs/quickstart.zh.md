@@ -2,17 +2,17 @@
 
 适用场景：你已经把 mimo2codex 接入 Codex，MiMo / DeepSeek 已经能正常聊天和调用普通工具，现在只想启用 `mimo-computer-use` 的电脑控制能力。
 
-## 1. 启用插件
+## 1. 启用插件并安装依赖
 
-推荐方式：打开 mimo2codex 管理台：
+打开 mimo2codex 管理台：
 
 ```text
 http://127.0.0.1:8788/admin/
 ```
 
-进入左侧 **插件**，打开 **MiMo Computer Use** 开关。mimo2codex 会热写
-`~/.codex/config.toml`，但 Codex CLI / Desktop 需要重启后才会加载新的 MCP
-server。
+进入左侧 **插件**，打开 **MiMo Computer Use** 开关（mimo2codex 会热写
+`~/.codex/config.toml`），再点 **安装依赖**（安装 nut.js）。想要真实桌面发光光标，
+就勾选 **「同时下载发光光标运行时（Electron）」**。装完重启 Codex CLI / Desktop。
 
 部署环境也可以用统一环境变量锁定：
 
@@ -20,12 +20,7 @@ server。
 MIMO2CODEX_PLUGIN=mimo-computer-use
 ```
 
-可用值：
-
-- `mimo-computer-use` / `computer-use` / `1` / `on`：启用当前内置 computer use 插件
-- `0` / `off` / `none`：禁用所有内置插件
-
-只要设置了 `MIMO2CODEX_PLUGIN`，后台插件页开关会变成只读；不设置时，后台开关可热更新。
+可用值：`mimo-computer-use` / `computer-use` / `1` / `on` 启用；`0` / `off` / `none` 禁用。
 
 ## 2. 手动方式：给 Codex 加 MCP server
 
@@ -38,98 +33,47 @@ args = ["<mimo2codex-install-root>/plugins/mimo-computer-use/server/index.mjs"]
 startup_timeout_sec = 20
 
 [mcp_servers.mimo-computer-use.env]
-MIMO_COMPUTER_USE_BACKEND = "auto"
+MIMO2CODEX_ADMIN_URL = "http://127.0.0.1:8788"
 ```
 
-保存后重启 Codex Desktop。
+`MIMO2CODEX_ADMIN_URL` 让插件把操作推送到管理台的 **Computer Use 监看** 页。保存后重启 Codex Desktop。这不会修改 mimo2codex 的 provider 配置。
 
-这不会修改 mimo2codex 的 provider 配置；它只是让 Codex 多启动一个本地 MCP 工具服务。新版 mimo2codex 切模型时会保留 `[mcp_servers.*]` 配置。
+## 3. 纯 Node，无需编译工具链
 
-## 3. 检测并安装 adapter（Trope CUA）
-
-mimo-computer-use 使用单一后端
-[Trope CUA](https://github.com/voctory/trope-cua)（**仅 macOS 与 Windows**），
-它是默认后端，`MIMO_COMPUTER_USE_BACKEND` 可以不设（`auto`）或显式设为 `trope`。
-
-Trope CUA 以**源码**分发：`npm run install-adapter` 会自动 `git clone` 仓库到
-`~/.mimo2codex/adapters/trope-cua`，再运行对应平台的构建脚本。先决条件：
-
-- 通用：`git`
-- macOS：Xcode Command Line Tools；装完后到「系统设置 → 隐私与安全性」授予
-  TropeCUA.app 的 Accessibility 与 Screen Recording 权限
-- Windows：PowerShell + 与 `global.json` 匹配的 .NET SDK
-
-检测并安装：
+桌面控制用 [nut.js](https://nutjs.dev/)（自带预编译原生插件），安装就是一句
+`npm install`——**不再需要 Trope CUA、git clone、Xcode 或 .NET 编译**。
 
 ```bash
 cd <mimo2codex-install-root>/plugins/mimo-computer-use
-npm run doctor            # 检测 trope-cua 是否在 PATH
-npm run install-adapter   # 自动 clone + 构建安装（macOS: install-macos.sh）
+npm run install-adapter   # npm install → nut.js
+npm run doctor            # 检测 nut.js / Electron / 平台 / 权限
 ```
 
-Windows（PowerShell）同理（构建脚本为 `install-windows.ps1 -SelfContained`）：
-
-```powershell
-cd <mimo2codex-install-root>\plugins\mimo-computer-use
-npm run doctor
-npm run install-adapter
-```
-
-装完后用 `trope-cua --help` / `trope-cua check_permissions` 自检。可执行文件名或
-启动参数不同时，可覆盖：
+Electron（可选，用于真实桌面发光光标）体积大，只在你要求时才装——在插件页勾选，或：
 
 ```bash
-MIMO_COMPUTER_USE_TROPE_CMD=/path/to/trope-cua
-MIMO_COMPUTER_USE_TROPE_ARGS="mcp"
+node ./server/index.mjs --install-adapter --with-electron
 ```
 
-## 4. 本地诊断
+macOS：装完到「系统设置 → 隐私与安全性」给宿主应用（终端 / Codex）授予
+「辅助功能」与「屏幕录制」权限。
 
-在仓库里运行：
+## 4. 在 Codex 里测试
 
-```bash
-cd <mimo2codex-install-root>/plugins/mimo-computer-use
-npm run doctor
-```
-
-如果 adapter 没装好，会看到类似：
-
-```json
-{
-  "ok": false,
-  "code": "adapter_missing",
-  "message": "Trope CUA is not available..."
-}
-```
-
-这说明插件服务本身是好的，只差系统 adapter 或权限。
-
-也可以直接让 Codex/MiMo 通过 MCP 工具 `computer_install_adapter` 发起安装。
-模型应先说明会下载哪个第三方 adapter，再调用安装工具。
-
-## 5. 在 Codex 里测试
-
-新开一个 Codex 对话，说：
+新开一个 Codex 对话：
 
 ```text
-Use the mimo-computer-use computer_state tool to inspect the current desktop.
+调用 mimo-computer-use 的 computer_state 看一下当前屏幕，然后帮我点击某处。
 ```
 
-或者中文：
+- 视觉模型：`computer_state` 直接回传截图图像。
+- 纯文本模型：调用时带 `ocr: true`，结果里会有 `targets`（屏幕文字 + 点击坐标），
+  再让模型「点击写着 XXX 的目标」。
 
-```text
-调用 mimo-computer-use 的 computer_state 看一下当前桌面状态。
-```
-
-成功后，模型会拿到一个文本 JSON 摘要。后续可以继续让它小步操作：
-
-```text
-根据 computer_state 的结果，点击搜索框，然后输入 hello。
-```
+可在 **Computer Use 监看** 页实时看到 AI 的截图、光标轨迹与操作日志。
 
 ## 注意
 
-- 这个插件不是 OpenAI 服务端的 `computer_use_preview`，而是 Codex 本地 MCP 工具。
-- 第一版只暴露 `computer_state`、`computer_click`、`computer_type`、`computer_key`、`computer_scroll`、`computer_wait`。
-- `computer_install_adapter` 只用于首次缺 adapter 时下载/安装第三方底座。
-- 工具结果只返回文本 JSON 和截图路径，不把图片直接放进 tool output，避免 MiMo / DeepSeek 历史不兼容。
+- 这是 Codex 本地 MCP 工具，不是 OpenAI 服务端的 `computer_use_preview`。
+- 暴露 `computer_state`、`computer_click`、`computer_type`、`computer_key`、`computer_scroll`、`computer_wait`、`computer_install_adapter`。
+- AI 运行时会接管你的真实鼠标；装了 Electron 时可用悬浮的「停止 AI 控制」按钮或热键 `Ctrl/Cmd+Alt+Esc` 立即停手。

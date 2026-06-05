@@ -1,30 +1,11 @@
-import * as trope from "../../adapters/shared/trope/index.mjs";
+import * as nutjs from "./nutjs.mjs";
 
-// Trope CUA is the single backend (macOS + Windows). MIMO_COMPUTER_USE_BACKEND is
-// kept as a forward-compatible knob (so future backends can be added without a
-// config break), but "auto" / "trope" both resolve to Trope today. Any other
-// explicit value is rejected so a stale "peekaboo" / "windows-mcp" in an old
-// config.toml surfaces a clear error instead of silently falling back.
-export function chooseAdapter(env = process.env) {
-  const forced = (env.MIMO_COMPUTER_USE_BACKEND || "auto").toLowerCase();
-  if (forced === "auto" || forced === "trope") {
-    return { name: "trope-cua", module: trope };
-  }
-  return {
-    name: "unsupported",
-    module: {
-      async diagnose() {
-        return {
-          ok: false,
-          backend: "unsupported",
-          code: "unsupported_backend",
-          message:
-            `MIMO_COMPUTER_USE_BACKEND="${forced}" is not supported. ` +
-            `mimo-computer-use uses Trope CUA — set MIMO_COMPUTER_USE_BACKEND=trope or unset it (auto).`,
-        };
-      },
-    },
-  };
+// nut.js is the single, pure-Node backend (macOS + Windows). The old
+// MIMO_COMPUTER_USE_BACKEND knob (which selected the external Trope CUA binary)
+// is gone — there is nothing else to choose. The function is kept so callers
+// don't churn and a future backend could slot in here.
+export function chooseAdapter() {
+  return { name: "nutjs", module: nutjs };
 }
 
 export async function waitMs(ms) {

@@ -12,7 +12,7 @@ args = ["/tmp/mimo-computer-use/server/index.mjs"]
 startup_timeout_sec = 20
 
 [mcp_servers.mimo-computer-use.env]
-MIMO_COMPUTER_USE_BACKEND = "auto"`;
+MIMO2CODEX_ADMIN_URL = "http://127.0.0.1:8788"`;
 
 describe("Codex built-in plugin TOML merge", () => {
   it("adds the MCP server block without touching unrelated config", () => {
@@ -71,6 +71,8 @@ command = "keep"
     const rendered = renderMcpServerBlock();
     expect(rendered).toContain(`[mcp_servers.mimo-computer-use]`);
     expect(rendered).toContain(`command = "node"`);
-    expect(rendered).toContain(`server/index.mjs`);
+    // Path separator differs per-OS (path.join → backslashes on Windows), so
+    // assert on the filename rather than a hard-coded "server/index.mjs".
+    expect(rendered).toContain(`index.mjs`);
   });
 });

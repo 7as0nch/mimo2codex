@@ -59,7 +59,7 @@ Quick answer:
 | **Image generation** | ❌ | — | `scripts/generate_image.py` (general) or `scripts/generate_pet.py` (Codex pets) — see below |
 | OCR / 识图 (when chat model is non-vision) | ⚠️ via `mimo-v2.5` or free pollinations | `scripts/ocr.py` | `--engine auto`: mimo if `MIMO_API_KEY` set, else pollinations (no key) |
 | Code interpreter / sandbox | ❌ | — | not provided |
-| Computer use / desktop control | ⚠️ via local MCP plugin | `mimo-computer-use` | Requires the local Trope CUA adapter (macOS + Windows) |
+| Computer use / desktop control | ⚠️ via local MCP plugin | `mimo-computer-use` | Pure Node (nut.js) — just `npm install`, no toolchain (macOS + Windows) |
 
 For the full capability matrix and examples, read [references/models.md](references/models.md).
 
@@ -102,15 +102,15 @@ python3 mimoskill/scripts/computer_use_setup.py --install
 
 Current installer behavior:
 
-- macOS and Windows only: `git clone`s [Trope CUA](https://github.com/voctory/trope-cua)
-  into `~/.mimo2codex/adapters/trope-cua` and runs its platform build script
-  (`install-macos.sh` / `install-windows.ps1 -SelfContained`), then verifies the
-  `trope-cua` command is on PATH. Needs `git` plus Xcode Command Line Tools (macOS)
-  or the .NET SDK (Windows). Grant Accessibility + Screen Recording on macOS first run.
+- Pure Node: runs `npm install` in `plugins/mimo-computer-use/` to install
+  **nut.js** (prebuilt native bindings — no git clone, no Xcode, no .NET). Add
+  `--with-electron` (or tick the box in the admin Plugins page) to also download
+  Electron for the on-desktop glowing cursor. On macOS, grant the host app
+  Accessibility + Screen Recording on first run.
 
 If Codex sandbox/network policy blocks the install command, ask for permission
 to rerun outside the sandbox. Do not tell the user to install Python packages by
-hand — point them at the Trope CUA install docs instead.
+hand — point them at the admin Plugins page or `npm run install-adapter`.
 
 After setup, continue with the local MCP tools exposed by
 `plugins/mimo-computer-use`: `computer_state`, `computer_click`,

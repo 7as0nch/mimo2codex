@@ -12,6 +12,7 @@ import IdeasPage from "./pages/IdeasPage";
 import IdeaDetailPage from "./pages/IdeaDetailPage";
 import SubmitIdeaPage from "./pages/SubmitIdeaPage";
 import Download from "./pages/Download";
+import Plugins from "./pages/Plugins";
 import NotFound from "./pages/NotFound";
 
 const { Content } = Layout;
@@ -24,6 +25,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/download" element={<Download />} />
+          <Route path="/plugins" element={<Plugins />} />
           <Route path="/ideas" element={<IdeasPage />} />
           <Route path="/ideas/new" element={<SubmitIdeaPage />} />
           <Route path="/ideas/:id" element={<IdeaDetailPage />} />

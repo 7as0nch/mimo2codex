@@ -1,100 +1,59 @@
 # MiMo Computer Use
 
-MiMo Computer Use is a local Codex MCP plugin that exposes a small, conservative
-desktop-control surface to MiMo, DeepSeek, and other OpenAI-compatible
-function-calling models routed through mimo2codex.
+MiMo Computer Use is a local Codex MCP plugin that lets MiMo, DeepSeek, and other
+OpenAI-compatible function-calling models (routed through mimo2codex) operate the
+desktop — click, type, scroll, screenshot.
 
-It does not implement OpenAI's hosted `computer_use_preview` protocol. Instead,
-it registers ordinary MCP tools that Codex can execute locally and that
-mimo2codex can pass through as regular function tools.
+It is **pure Node**: desktop control is driven by [nut.js](https://nutjs.dev/),
+which ships prebuilt native bindings, so installing it is a plain `npm install` —
+**no Trope CUA, no git clone, no Xcode / .NET build toolchain**. It does not
+implement OpenAI's hosted `computer_use_preview` protocol; it registers ordinary
+MCP function tools that any tool-calling model can drive.
+
+## How models perceive the screen (A+C)
+
+- **Vision models** — `computer_state` returns the screenshot as an MCP image
+  block (plus a saved path), so the model can look and pick a coordinate.
+- **Text-only models** — call `computer_state` with `ocr: true` and the result
+  also includes `targets`: a list of on-screen text with click coordinates
+  (OCR via `mimoskill/scripts/ocr.py --boxes`, tesseract, local/offline). The
+  model clicks a target by its text; `computer_click` maps it to a point.
 
 ## Quick start
 
-If mimo2codex already works in Codex, the easiest path is:
+1. Open the admin console at `http://127.0.0.1:8788/admin/` → **Plugins**.
+2. Enable **MiMo Computer Use**, then click **Install dependencies** (installs
+   nut.js). Tick *"also download the glowing-cursor runtime (Electron)"* if you
+   want the on-desktop cursor.
+3. Restart Codex CLI / Desktop so it loads the MCP server.
+4. Watch the AI work on the **Computer Use Monitor** admin page.
 
-1. Open the admin console at `http://127.0.0.1:8788/admin/`.
-2. Go to **Plugins**.
-3. Enable **MiMo Computer Use**.
-4. Restart Codex CLI / Desktop so it loads the MCP server.
-5. Run `npm run doctor`; if the adapter is missing, run
-   `npm run install-adapter` and watch the progress output.
-
-For deployment-style setups, lock the state with:
-
-```bash
-MIMO2CODEX_PLUGIN=mimo-computer-use
-```
-
-Supported current values:
-
-- `mimo-computer-use`, `computer-use`, `1`, `on` — enable this built-in plugin.
-- `0`, `off`, `none` — disable built-in plugins.
-
-When `MIMO2CODEX_PLUGIN` is set, the admin switch is read-only. When it is
-unset, the admin page can hot-write `~/.codex/config.toml`.
-
-Manual configuration is still supported. Add the local MCP server to
-`~/.codex/config.toml`:
-
-```toml
-[mcp_servers.mimo-computer-use]
-command = "node"
-args = ["<mimo2codex-install-root>/plugins/mimo-computer-use/server/index.mjs"]
-startup_timeout_sec = 20
-
-[mcp_servers.mimo-computer-use.env]
-MIMO_COMPUTER_USE_BACKEND = "auto"
-```
-
-Then restart Codex Desktop. In a new Codex thread, ask:
-
-```text
-Use mimo-computer-use computer_state to inspect the current desktop.
-```
-
-The plugin can load even before the Trope CUA adapter is installed. In that case
-`computer_state` returns a setup diagnostic ("Trope CUA is not available"). Agents
-may then call `computer_install_adapter` after explaining the third-party download
-plan to the user.
+macOS: grant the host app (your terminal / Codex) **Accessibility** + **Screen
+Recording** in System Settings → Privacy & Security, or clicks/screenshots fail.
 
 ## Tools
 
-- `computer_state` — inspect the current app/window and return a JSON summary.
-- `computer_click` — click by element/target hint or screen coordinates.
+- `computer_state` — screenshot + screen size + `scale`; `ocr:true` adds clickable text `targets`.
+- `computer_click` — move the cursor (it glides) to `x/y` (or a `target` text) and click.
 - `computer_type` — type literal text.
-- `computer_key` — press a key or shortcut.
-- `computer_scroll` — scroll the active view or a coordinate target.
-- `computer_wait` — wait for UI to settle.
-- `computer_install_adapter` — detect/install the missing platform adapter after
-  user-facing explanation.
+- `computer_key` — press a key/shortcut (`Enter`, `Ctrl+C`, `Cmd+L`, `Alt+Tab`…).
+- `computer_scroll` — scroll the view.
+- `computer_wait` — wait for the UI to settle (internal).
+- `computer_install_adapter` — install nut.js (and optionally Electron) after telling the user.
 
-Tool results are text JSON only. When an adapter produces a screenshot, it should
-return a local path in the JSON payload instead of embedding image bytes in the
-tool result. This keeps MiMo and DeepSeek tool-result history compatible.
+## Glowing cursor (optional Electron overlay)
 
-## Backend
+When Electron is installed, the plugin spawns a transparent, click-through,
+always-on-top overlay that draws a glowing cyan cursor + click ripples on the
+real desktop while the AI acts, plus a **Stop / Resume AI control** pill and a
+global hotkey (`Ctrl/Cmd+Alt+Esc`). Without Electron everything still works — you
+just won't see the desktop cursor (the Monitor page still shows it).
 
-A single backend, [Trope CUA](https://github.com/voctory/trope-cua), on **macOS
-and Windows**. It is the default — `MIMO_COMPUTER_USE_BACKEND` may be left unset
-(`auto`) or set explicitly to `trope`. The command/args are overridable via
-`MIMO_COMPUTER_USE_TROPE_CMD` / `MIMO_COMPUTER_USE_TROPE_ARGS`.
-
-Trope CUA is distributed as source: `npm run install-adapter` clones the repo and
-runs its platform build script (`install-macos.sh` / `install-windows.ps1
--SelfContained`). Requires `git` plus Xcode Command Line Tools (macOS) or the .NET
-SDK (Windows). The plugin does not vendor Trope CUA.
-
-## Diagnose and install
+## Diagnose / install / test
 
 ```bash
 cd plugins/mimo-computer-use
-npm run doctor
-npm run install-adapter
-```
-
-## Run tests
-
-```bash
-cd plugins/mimo-computer-use
-npm test
+npm run doctor              # reports nut.js / Electron / platform / permissions
+npm run install-adapter     # npm install (nut.js); add --with-electron for the overlay
+npm test                    # node --test
 ```

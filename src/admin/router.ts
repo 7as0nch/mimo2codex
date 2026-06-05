@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, createReadStream } from "node:fs";
+import { homedir } from "node:os";
+import {
+  pushComputerUseEvent,
+  subscribeComputerUse,
+  recentComputerUseEvents,
+} from "./computerUseBus.js";
 import { spawn } from "node:child_process";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,13 +82,11 @@ import {
   applyMcpServerEnabled,
   builtinComputerUsePlugin,
   configHasMcpServer,
-  configureTropeBackendInConfig,
   pluginServerPath,
   readMcpPluginInstalled,
   readPluginMcpEnvFromConfig,
   readQuickstartMarkdown,
   runPluginDoctor,
-  stripTropeCmdFromConfig,
 } from "../codex/plugins.js";
 import {
   appendCodexHistory,
@@ -1244,10 +1248,12 @@ async function handleApi(ctx: RouteContext): Promise<void> {
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");
   }
 
-  // Adapter (Trope CUA) management for the computer-use plugin:
+  // Dependency management for the computer-use plugin (pure Node: nut.js +
+  // optional Electron overlay — no external binary to build/pin):
   //   GET  /admin/api/plugins/:id/adapter            → probe install state
-  //   POST /admin/api/plugins/:id/adapter/install    → SSE-streamed build
-  //   POST /admin/api/plugins/:id/adapter/uninstall  → SSE-streamed uninstall
+  //   POST /admin/api/plugins/:id/adapter/install     → SSE-streamed npm install
+  //        (?electron=1 also downloads the glowing-cursor Electron runtime)
+  //   POST /admin/api/plugins/:id/adapter/uninstall   → SSE-streamed removal
   const adapterRoute = pathname.match(
     /^\/admin\/api\/plugins\/([^/]+)\/adapter(?:\/(install|uninstall))?$/
   );
@@ -1265,11 +1271,14 @@ async function handleApi(ctx: RouteContext): Promise<void> {
 
     if (action && req.method === "POST") {
       if (!requireAdmin(ctx)) return;
-      const flag = action === "install" ? "--install-adapter" : "--uninstall-adapter";
       const serverPath = pluginServerPath();
       if (!existsSync(serverPath)) {
         return sendError(res, 500, "plugin_missing", `plugin server not found at ${serverPath}`);
       }
+      const withElectron =
+        new URL(req.url ?? "", "http://localhost").searchParams.get("electron") === "1";
+      const childArgs = [serverPath, action === "install" ? "--install-adapter" : "--uninstall-adapter"];
+      if (action === "install" && withElectron) childArgs.push("--with-electron");
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -1281,32 +1290,24 @@ async function handleApi(ctx: RouteContext): Promise<void> {
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
 
-      writeEvent("start", { action, ts: Date.now() });
-      // Install the adapter under mimo2codex's (possibly migrated) data dir.
+      writeEvent("start", { action, electron: withElectron, ts: Date.now() });
+      // Keep the plugin's screenshot frames under mimo2codex's data dir so the
+      // live monitor (served by this proxy) can read them back.
       const adapterEnv: Record<string, string> = cfg.dataDir
-        ? { MIMO2CODEX_ADAPTERS_DIR: join(cfg.dataDir, "adapters") }
+        ? { MIMO2CODEX_COMPUTER_USE_DIR: join(cfg.dataDir, "computer-use") }
         : {};
-      const child = spawn(process.execPath, [serverPath, flag], {
+      const child = spawn(process.execPath, childArgs, {
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, ...readPluginMcpEnvFromConfig(), ...adapterEnv },
       });
-      // Kill the child build/uninstall if the browser aborts the request.
       const onClose = (): void => {
         if (!child.killed) child.kill("SIGTERM");
       };
       req.on("close", onClose);
 
-      // Capture the resolved executable path the installer prints so we can
-      // write it into Codex config on success (install only).
-      let installedExe: string | null = null;
       const emit = (chunk: Buffer, stream: "stdout" | "stderr"): void => {
         for (const line of chunk.toString("utf8").split(/\r?\n/)) {
           if (line.length === 0) continue;
-          const m = /^INSTALLED_EXE=(.+)$/.exec(line);
-          if (m) {
-            installedExe = m[1].trim();
-            continue; // internal marker — don't surface in the UI log
-          }
           writeEvent("log", { line, stream });
         }
       };
@@ -1320,29 +1321,67 @@ async function handleApi(ctx: RouteContext): Promise<void> {
       child.on("close", (code) => {
         req.off("close", onClose);
         const ok = code === 0;
-        // Sync Codex config to the result: point at the freshly built binary on
-        // install, or clean the CMD line on uninstall.
-        let configChanged = false;
-        try {
-          if (ok && action === "install" && installedExe) {
-            configChanged = configureTropeBackendInConfig(installedExe).changed;
-          } else if (ok && action === "uninstall") {
-            configChanged = stripTropeCmdFromConfig().changed;
-          }
-        } catch (err) {
-          writeEvent("log", {
-            line: `config update failed: ${(err as Error).message}`,
-            stream: "stderr",
-          });
-        }
-        log.info(`plugin adapter ${action} finished`, { exitCode: code, configChanged, installedExe });
-        writeEvent("done", { ok, exitCode: code, configChanged });
+        // Pure Node: nothing to pin in config.toml (no external exe path).
+        log.info(`plugin adapter ${action} finished`, { exitCode: code, electron: withElectron });
+        writeEvent("done", { ok, exitCode: code, configChanged: false });
         res.end();
       });
       return;
     }
 
     return sendError(res, 405, "method_not_allowed", action ? "use POST" : "use GET");
+  }
+
+  // ── Computer-use live monitor ────────────────────────────────────────────
+  // The computer-use MCP server runs under Codex (a separate process), so it
+  // POSTs each action here; the admin "Monitor" page subscribes via SSE. We
+  // keep a small in-memory ring buffer and serve the screenshot frames the MCP
+  // server saved under the data dir.
+  if (pathname === "/admin/api/computer-use/events" && req.method === "POST") {
+    const body = await readJsonBody<Record<string, unknown>>(req);
+    pushComputerUseEvent(body);
+    return sendJson(res, 200, { ok: true });
+  }
+  if (pathname === "/admin/api/computer-use/stream" && req.method === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-store");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    const sub = subscribeComputerUse((evt) => {
+      res.write(`event: action\ndata: ${JSON.stringify(evt)}\n\n`);
+    });
+    // Replay recent history so a freshly opened panel isn't blank.
+    for (const evt of recentComputerUseEvents()) {
+      res.write(`event: action\ndata: ${JSON.stringify(evt)}\n\n`);
+    }
+    const onClose = (): void => sub();
+    req.on("close", onClose);
+    return;
+  }
+  const frameRoute = pathname.match(/^\/admin\/api\/computer-use\/frame\/([A-Za-z0-9._-]+)$/);
+  if (frameRoute && req.method === "GET") {
+    const name = frameRoute[1];
+    // The MCP server (launched by Codex, not us) writes frames under its own
+    // MIMO2CODEX_COMPUTER_USE_DIR — which defaults to ~/.mimo2codex/computer-use
+    // unless we injected an override into config.toml. The proxy's own data dir
+    // may differ (desktop app, custom MIMO2CODEX_DATA_DIR), so check BOTH the
+    // data-dir location and the home-dir default and serve whichever has it.
+    const candidateDirs = [
+      cfg.dataDir ? join(cfg.dataDir, "computer-use", "frames") : null,
+      join(homedir(), ".mimo2codex", "computer-use", "frames"),
+    ].filter((d): d is string => d !== null);
+    // The regex already blocks "/" and ".." so `name` can't escape a dir.
+    const file = candidateDirs.map((d) => join(d, name)).find((f) => existsSync(f));
+    if (!file) {
+      return sendError(res, 404, "frame_not_found", "screenshot frame not found");
+    }
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "no-store");
+    createReadStream(file).pipe(res);
+    return;
   }
 
   // GET /admin/api/provider-presets

@@ -1,7 +1,7 @@
 {
   "name": "mimo-computer-use",
-  "version": "0.1.0",
-  "description": "Codex MCP plugin that adapts Trope CUA (macOS + Windows) for MiMo-friendly computer use.",
+  "version": "0.2.0",
+  "description": "Pure-Node Codex MCP plugin: local computer use (mouse/keyboard/screenshot via nut.js) for MiMo, DeepSeek, and OpenAI-compatible models. No Trope CUA, no compiler toolchain.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -14,6 +14,11 @@
     "doctor": "node ./server/index.mjs --doctor",
     "install-adapter": "node ./server/index.mjs --install-adapter",
     "uninstall-adapter": "node ./server/index.mjs --uninstall-adapter"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.0",
+    "electron": "^42.3.3",
+    "jimp": "^1.6.0"
   },
   "engines": {
     "node": ">=18"

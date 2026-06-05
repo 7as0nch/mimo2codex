@@ -347,6 +347,74 @@ def run_tesseract(
     return "\n\n".join(c for c in chunks if c)
 
 
+def run_tesseract_boxes(
+    *, image_args: list[str], lang_arg: str, min_conf: float = 40.0
+) -> list[dict[str, Any]]:
+    """Word-level boxes via tesseract TSV. Returns [{text,x,y,w,h,conf}].
+
+    TSV columns: level page block par line word left top width height conf text.
+    We keep word-level rows (level==5) with non-empty text above min_conf.
+    """
+    boxes: list[dict[str, Any]] = []
+    for arg in image_args:
+        path, is_temp = resolve_to_local_file(arg)
+        try:
+            r = subprocess.run(
+                ["tesseract", str(path), "stdout", "-l", lang_arg, "tsv"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+        except FileNotFoundError:
+            sys.stderr.write(
+                "error: tesseract not found on PATH. Install:\n"
+                "  macOS:   brew install tesseract tesseract-lang\n"
+                "  Ubuntu:  sudo apt install tesseract-ocr tesseract-ocr-chi-sim\n"
+                "  Windows: https://github.com/UB-Mannheim/tesseract/wiki\n"
+            )
+            sys.exit(1)
+        finally:
+            if is_temp:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        if r.returncode != 0:
+            sys.stderr.write(f"tesseract failed for {arg}: {r.stderr.strip()}\n")
+            sys.exit(1)
+        lines = r.stdout.splitlines()
+        for line in lines[1:]:  # skip header
+            cols = line.split("\t")
+            if len(cols) < 12:
+                continue
+            if cols[0] != "5":  # word level
+                continue
+            text = cols[11].strip()
+            if not text:
+                continue
+            try:
+                conf = float(cols[10])
+            except ValueError:
+                conf = -1.0
+            if conf < min_conf:
+                continue
+            try:
+                boxes.append(
+                    {
+                        "text": text,
+                        "x": int(cols[6]),
+                        "y": int(cols[7]),
+                        "w": int(cols[8]),
+                        "h": int(cols[9]),
+                        "conf": round(conf, 1),
+                    }
+                )
+            except ValueError:
+                continue
+    return boxes
+
+
 # --- HTTP -------------------------------------------------------------------
 
 POLLINATIONS_URL = "https://text.pollinations.ai/openai"
@@ -491,9 +559,44 @@ def main() -> None:
     )
     p.add_argument("--json", action="store_true", help="wrap stdout as JSON envelope")
     p.add_argument("--stream", action="store_true", help="stream the response")
+    p.add_argument(
+        "--boxes",
+        action="store_true",
+        help="word-level bounding boxes via tesseract TSV (for computer-use: "
+        "maps on-screen text to click coordinates). Local, no key/network. "
+        "Output: JSON array of {text,x,y,w,h,conf}. Implies --engine tesseract.",
+    )
     args = p.parse_args()
 
     api_key = os.environ.get("MIMO_API_KEY")
+
+    # --boxes: word-level bounding boxes (computer-use coordinate mapping).
+    # Tesseract-only and resolved before everything else so it ignores --engine
+    # / --mode. Needs the images resolved first.
+    if args.boxes:
+        if not tesseract_available():
+            sys.stderr.write(
+                "error: --boxes needs tesseract (local OCR with coordinates).\n"
+                "  macOS:   brew install tesseract tesseract-lang\n"
+                "  Ubuntu:  sudo apt install tesseract-ocr tesseract-ocr-chi-sim\n"
+                "  Windows: https://github.com/UB-Mannheim/tesseract/wiki\n"
+            )
+            sys.exit(3)
+        box_args = args.images
+        if not box_args and not sys.stdin.isatty():
+            box_args = ["-"]
+        if not box_args:
+            sys.stderr.write("error: --boxes needs an IMAGE arg or piped bytes.\n")
+            sys.exit(2)
+        lang_arg = map_lang_to_tesseract(args.lang)
+        sys.stderr.write(f"[ocr] mode=boxes engine=tesseract lang={lang_arg} images={len(box_args)}\n")
+        boxes = run_tesseract_boxes(image_args=box_args, lang_arg=lang_arg)
+        if args.json:
+            print(json.dumps({"engine": "tesseract", "lang": lang_arg, "boxes": boxes}, ensure_ascii=False))
+        else:
+            for b in boxes:
+                print(f"{b['text']}\t{b['x']},{b['y']},{b['w']},{b['h']}")
+        return
 
     # Resolve engine.
     if args.engine == "mimo":

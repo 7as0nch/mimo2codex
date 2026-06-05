@@ -5,6 +5,7 @@
   "sessions": "Session Manager",
   "providers": "Providers",
   "plugins": "Plugins",
+  "computerUse": "Computer Use Monitor",
   "models": "Built-in Models",
   "logs": "Logs"
 }

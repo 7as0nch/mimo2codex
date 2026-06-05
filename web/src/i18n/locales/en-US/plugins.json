@@ -1,12 +1,12 @@
 {
   "title": "Plugins",
-  "subtitle": "Manage built-in local Codex plugins shipped with mimo2codex. Environment variables override UI toggles.",
+  "subtitle": "Manage the local Codex plugins bundled with mimo2codex. Environment variables take precedence over the admin toggle.",
   "refresh": "Refresh",
   "yes": "Yes",
   "no": "No",
   "notice": {
-    "title": "First use detects adapters; missing adapters can be installed directly",
-    "desc": "The switch writes the built-in MCP server into Codex config. Before desktop operations, the plugin checks for the cross-platform Trope CUA adapter; when missing, run npm run install-adapter or let the model call computer_install_adapter and surface progress."
+    "title": "Pure Node — no compiler toolchain required",
+    "desc": "The toggle writes the built-in MCP server into your Codex config. Desktop control is driven by nut.js (mouse/keyboard/screenshot) — just npm install, no git/.NET/Xcode. Vision models act on the screenshot; text-only models act on OCR'd text coordinates. Electron is optional and draws a glowing cursor on the real desktop."
   },
   "category": {
     "computer-use": "Computer Use"
@@ -14,59 +14,71 @@
   "status": {
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "envLocked": "Env locked",
+    "envLocked": "Env-locked",
     "missing": "Plugin files missing"
   },
   "envLocked": {
-    "title": "{{envKey}} is set, so the UI toggle is read-only",
-    "desc": "The current environment value resolves to: {{value}}. Remove it and restart mimo2codex to use admin hot updates instead."
+    "title": "{{envKey}} is set; the admin toggle is read-only",
+    "desc": "The effective value is: {{value}}. To manage it from the admin UI, remove the variable and restart mimo2codex."
   },
   "configMismatch": {
-    "title": "Plugin state and Codex config differ",
-    "desc": "The plugin is expected to be enabled, but config.toml does not contain the MCP server yet. Refresh or toggle it again."
+    "title": "Plugin state differs from the Codex config",
+    "desc": "It's expected to be enabled, but config.toml has no matching MCP server yet. Click refresh, or toggle the switch once."
   },
   "fields": {
     "id": "Plugin ID",
     "mcpServer": "MCP Server",
     "configPath": "Codex config",
     "serverPath": "Plugin entry",
-    "envKey": "Environment variable",
+    "envKey": "Env variable",
     "configEnabled": "Written to config"
   },
   "usage": {
     "title": "How to use it after enabling",
-    "desc": "Restart Codex CLI / Desktop and the model can see computer_state, computer_click, computer_type, computer_key, computer_scroll, computer_wait, and computer_install_adapter MCP tools.",
-    "prompt": "Please call computer_state, inspect the current screen, and tell me the available next steps."
+    "desc": "Restart Codex CLI / Desktop and the model can see computer_state, computer_click, computer_type, computer_key, computer_scroll, computer_wait, and computer_install_adapter MCP tools. Watch the AI act live on the \"Computer Use Monitor\" page.",
+    "prompt": "Please call computer_state, look at the screen, then click/operate for me."
   },
   "msg": {
     "enabled": "Plugin enabled and Codex config updated; restart Codex to load it.",
     "disabled": "Plugin disabled and removed from Codex config."
   },
+  "enableLabel": "Enable",
+  "openMonitor": "Open Computer Use Monitor",
+  "learnMore": "Read the plugin intro on docweb",
+  "contribute": {
+    "title": "Contribute a plugin",
+    "desc": "Built a fun computer-use / MCP plugin adapter? Submit it on docweb — once accepted it shows up here.",
+    "cta": "Submit"
+  },
   "adapter": {
-    "title": "Desktop backend: Trope CUA",
-    "desc": "The open-source backend that actually drives the desktop (macOS / Windows only). It ships as source, so install clones and builds locally — needs git and the .NET 10 SDK, and takes a few minutes.",
-    "installed": "Installed",
-    "notInstalled": "Not installed",
+    "title": "Desktop-control dependencies (pure Node)",
+    "desc": "nut.js is the core backend (mouse/keyboard/screenshot, prebuilt, no toolchain). Electron is optional — it draws a glowing cursor on the real desktop.",
+    "installed": "nut.js ready",
+    "notInstalled": "nut.js not installed",
     "detecting": "Detecting…",
     "backend": "Backend",
-    "path": "Executable",
+    "path": "Command",
     "prereqTitle": "Prerequisites",
-    "install": "Download & build",
+    "install": "Install dependencies",
     "reinstall": "Reinstall",
-    "uninstall": "Uninstall",
     "recheck": "Re-check",
-    "installModalTitle": "Download & build Trope CUA",
-    "uninstallModalTitle": "Uninstall Trope CUA",
+    "withElectronLabel": "Also download the glowing-cursor runtime (Electron, large)",
+    "installModalTitle": "Install dependencies (npm install)",
+    "uninstallModalTitle": "Remove the glowing-cursor runtime",
     "running": "Running…",
-    "installOkRestart": "Install complete. Restart Codex so it loads the backend.",
-    "uninstallOk": "Uninstalled. Restart your terminal / Codex so the PATH change takes effect.",
+    "installOkRestart": "Installed. Restart Codex so it reloads the plugin.",
+    "uninstallOk": "Removed the Electron glowing cursor (nut.js kept — basic control still works). Restart Codex to apply.",
     "failed": "Action failed — check the log above.",
-    "configCleaned": "Removed MIMO_COMPUTER_USE_TROPE_CMD from Codex config.",
-    "configUpdated": "Pointed Codex config at the freshly installed executable (backend=trope).",
-    "confirmUninstall": "Uninstall Trope CUA? This removes the binary and cleans your PATH.",
     "close": "Close",
     "cancel": "Cancel",
-    "notSelfContained": "The build is framework-dependent (needs the .NET 10 Desktop Runtime installed) and may trigger a 'needs .NET 10' error in Codex. Reinstall to build self-contained.",
-    "unsupported": "Trope CUA supports macOS and Windows only."
+    "unsupported": "This platform isn't supported (nut.js supports macOS and Windows).",
+    "overlayTitle": "Glowing cursor (Electron)",
+    "overlayInstalled": "Installed",
+    "overlayNotInstalled": "Not installed",
+    "overlayDesc": "Shows a glowing cyan cursor and click ripples on the real desktop while the AI works, plus a \"Stop AI control\" button. Optional — without it everything still works, you just won't see the desktop cursor (you can still watch the Monitor page).",
+    "downloadElectron": "Download glowing cursor (Electron)",
+    "removeElectron": "Remove glowing cursor",
+    "confirmRemoveElectron": "Remove the Electron glowing-cursor runtime? nut.js is kept.",
+    "macPermission": "macOS: after install, grant Accessibility + Screen Recording to the host app (terminal / Codex) in System Settings → Privacy & Security."
   }
 }
