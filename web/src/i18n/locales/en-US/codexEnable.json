@@ -62,6 +62,15 @@
     "hint": "Thinking ON/OFF: when OFF, every provider skips thinking (mimo / deepseek send thinking:{type:\"disabled\"}, sensenova / other generic send reasoning_effort:\"none\"). When ON, each provider follows its own default (most clients don't include reasoning effort for non-GPT-5 models, so the upstream may skip thinking on simple tasks). Force high reasoning effort: only available while Thinking is ON — if Codex didn't pass an effort, mimo2codex injects reasoning_effort=\"high\"; if Codex did pass one, that value is respected. Takes effect immediately (no restart).",
     "cliOverride": "Thinking ON/OFF is currently controlled by CLI flag (--disable-thinking) or env (MIMO2CODEX_DISABLE_THINKING). The switch is locked. Restart without those args to control via UI."
   },
+  "visionFallback": {
+    "title": "Multimodal Fallback",
+    "scopeNote": "Currently only MiMo models are supported. Other providers/models are not supported yet.",
+    "statusOn": "Enabled: image requests auto-switch to vision model",
+    "statusOff": "Disabled",
+    "hint": "When enabled, if a request contains images but the current model doesn't support vision (e.g. mimo-v2.5-pro), automatically switch to the specified multimodal model (default: mimo-v2.5) to avoid images being silently dropped.",
+    "modelLabel": "Fallback model",
+    "modelPlaceholder": "e.g. mimo-v2.5"
+  },
   "targets": {
     "title": "Available combinations",
     "externalWarn": "Your current ~/.codex/auth.json was not written by mimo2codex (probably a real OpenAI login or another tool). 'Write files and enable' will back it up first, then overwrite — restore is always available.",

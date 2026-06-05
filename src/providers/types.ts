@@ -86,6 +86,12 @@ export interface Provider {
   // — callers will then fall back to defaultBaseUrl.
   inferBaseUrlFromKey?(apiKey: string): string | null;
   resolveModel(clientModel: string): ProviderModel | null;
+  // Optional vision capability probe. ONLY providers that implement this take
+  // part in the multimodal (vision) fallback: the server skips the whole
+  // fallback when a provider omits it, so the feature stays MiMo-specific and
+  // never rewrites models for DeepSeek / generic providers. Returns whether the
+  // given model can accept image input.
+  supportsVision?(model: string): boolean;
   preprocessResponses(req: ResponsesRequest, ctx: PreprocessCtx): ChatRequest;
   preprocessChat(req: ChatRequest, ctx: PreprocessCtx): ChatRequest;
   // Lightweight hook for wireApi === "responses". Receives the original Codex

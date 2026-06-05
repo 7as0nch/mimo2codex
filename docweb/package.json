@@ -1,7 +1,7 @@
 {
   "name": "mimo2codex-docweb",
   "private": true,
-  "version": "0.5.20",
+  "version": "0.5.23",
   "type": "module",
   "description": "Landing + documentation site for mimo2codex (independent Vite workspace)",
   "scripts": {

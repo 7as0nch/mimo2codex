@@ -234,6 +234,63 @@ describe("admin REST", () => {
     expect((get.json as { settings: Record<string, string> }).settings["ui.theme"]).toBe("dark");
   });
 
+  it("GET /admin/api/log-settings returns defaults for silent rewrite, body mode, and retention", async () => {
+    const r = await call("GET", "/admin/api/log-settings");
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      silentRewrite: true,
+      cliOverride: null,
+      bodyMode: "full",
+      bodyModeCliOverride: null,
+      retentionDays: null,
+      retentionDaysCliOverride: null,
+      retentionDaysCliOverrideActive: false,
+    });
+  });
+
+  it("PUT /admin/api/log-settings updates body mode and retention", async () => {
+    const put = await call("PUT", "/admin/api/log-settings", {
+      silentRewrite: false,
+      bodyMode: "errors-only",
+      retentionDays: 14,
+    });
+    expect(put.status).toBe(200);
+    const get = await call("GET", "/admin/api/log-settings");
+    expect(get.status).toBe(200);
+    expect(get.json).toMatchObject({
+      silentRewrite: false,
+      bodyMode: "errors-only",
+      retentionDays: 14,
+      retentionDaysCliOverrideActive: false,
+    });
+  });
+
+  it("PUT /admin/api/log-settings validates the whole payload before writing", async () => {
+    const bad = await call("PUT", "/admin/api/log-settings", {
+      silentRewrite: false,
+      bodyMode: "bad-mode",
+    });
+    expect(bad.status).toBe(400);
+    const get = await call("GET", "/admin/api/log-settings");
+    expect(get.status).toBe(200);
+    expect(get.json).toMatchObject({
+      silentRewrite: true,
+      bodyMode: "full",
+      retentionDays: null,
+    });
+  });
+
+  it("GET /admin/api/log-settings marks a CLI-disabled retention override as read-only", async () => {
+    cfg.logRetentionDaysFromCli = null;
+    const r = await call("GET", "/admin/api/log-settings");
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      retentionDays: null,
+      retentionDaysCliOverride: null,
+      retentionDaysCliOverrideActive: true,
+    });
+  });
+
   it("404 for unknown admin path", async () => {
     const r = await call("GET", "/admin/api/nope");
     expect(r.status).toBe(404);

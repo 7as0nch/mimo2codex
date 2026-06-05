@@ -98,6 +98,12 @@ import {
   setActiveOverride,
 } from "../db/overrides.js";
 import {
+  parseLogBodyMode,
+  parseLogRetentionDays,
+  resolveLogBodyMode,
+  resolveLogRetentionDays,
+} from "../logging/settings.js";
+import {
   callOpenAICompat,
   callResponsesPassthrough,
   UpstreamError,
@@ -1045,12 +1051,67 @@ async function handleApi(ctx: RouteContext): Promise<void> {
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");
   }
 
+  // GET/PUT /admin/api/vision-fallback — multimodal fallback toggle + model.
+  // When enabled, requests containing images are automatically routed to a
+  // vision-capable model even if the client's model doesn't support images.
+  if (pathname === "/admin/api/vision-fallback") {
+    if (req.method === "GET") {
+      const enabled = (() => {
+        try {
+          return getSetting("codex.visionFallbackEnabled") === "1";
+        } catch {
+          return false;
+        }
+      })();
+      const model = (() => {
+        try {
+          return getSetting("codex.visionFallbackModel") || "mimo-v2.5";
+        } catch {
+          return "mimo-v2.5";
+        }
+      })();
+      return sendJson(res, 200, { enabled, model });
+    }
+    if (req.method === "PUT") {
+      const body = await readJsonBody<{ enabled?: unknown; model?: unknown }>(req);
+      let changed = false;
+      if (typeof body.enabled === "boolean") {
+        setSetting("codex.visionFallbackEnabled", body.enabled ? "1" : "0");
+        log.info(`codex.visionFallbackEnabled set to ${body.enabled} via admin UI`);
+        changed = true;
+      }
+      if (typeof body.model === "string") {
+        const trimmed = body.model.trim();
+        if (!trimmed) {
+          return sendError(res, 400, "invalid_body", "model must be a non-empty string");
+        }
+        setSetting("codex.visionFallbackModel", trimmed);
+        log.info(`codex.visionFallbackModel set to "${trimmed}" via admin UI`);
+        changed = true;
+      }
+      if (!changed) {
+        return sendError(
+          res,
+          400,
+          "invalid_body",
+          "body must include at least one of: enabled (boolean), model (string)",
+        );
+      }
+      return sendJson(res, 200, { ok: true });
+    }
+    return sendError(res, 405, "method_not_allowed", "use GET or PUT");
+  }
+
   // GET/PUT /admin/api/log-settings — quick toggle for the "model fallback
   // applied" rewrite log. Default is silent (suppressed). env
   // MIMO2CODEX_SILENT_REWRITE, when set, overrides and disables the toggle.
   if (pathname === "/admin/api/log-settings") {
     if (req.method === "GET") {
       const cliOverride = cfg.silentRewriteFromCli ?? null;
+      const bodyModeCliOverride = cfg.logBodyModeFromCli ?? null;
+      const retentionDaysCliOverride =
+        cfg.logRetentionDaysFromCli === undefined ? null : cfg.logRetentionDaysFromCli;
+      const retentionDaysCliOverrideActive = cfg.logRetentionDaysFromCli !== undefined;
       const setting = (() => {
         try {
           const s = getSetting("logging.silentRewrite");
@@ -1060,15 +1121,77 @@ async function handleApi(ctx: RouteContext): Promise<void> {
         }
       })();
       const effective = cliOverride !== null ? cliOverride : setting;
-      return sendJson(res, 200, { silentRewrite: effective, cliOverride });
+      return sendJson(res, 200, {
+        silentRewrite: effective,
+        cliOverride,
+        bodyMode: resolveLogBodyMode(cfg),
+        bodyModeCliOverride,
+        retentionDays: resolveLogRetentionDays(cfg),
+        retentionDaysCliOverride,
+        retentionDaysCliOverrideActive,
+      });
     }
     if (req.method === "PUT") {
-      const body = await readJsonBody<{ silentRewrite?: unknown }>(req);
-      if (typeof body.silentRewrite !== "boolean") {
-        return sendError(res, 400, "invalid_body", "silentRewrite must be a boolean");
+      const body = await readJsonBody<{
+        silentRewrite?: unknown;
+        bodyMode?: unknown;
+        retentionDays?: unknown;
+      }>(req);
+      const writes: Array<{ key: string; value: string; logMessage: string }> = [];
+      if (body.silentRewrite !== undefined) {
+        if (typeof body.silentRewrite !== "boolean") {
+          return sendError(res, 400, "invalid_body", "silentRewrite must be a boolean");
+        }
+        writes.push({
+          key: "logging.silentRewrite",
+          value: body.silentRewrite ? "1" : "0",
+          logMessage: `logging.silentRewrite set to ${body.silentRewrite} via admin UI`,
+        });
       }
-      setSetting("logging.silentRewrite", body.silentRewrite ? "1" : "0");
-      log.info(`logging.silentRewrite set to ${body.silentRewrite} via admin UI`);
+      if (body.bodyMode !== undefined) {
+        if (typeof body.bodyMode !== "string" || !parseLogBodyMode(body.bodyMode)) {
+          return sendError(res, 400, "invalid_body", "bodyMode must be full, errors-only, or off");
+        }
+        writes.push({
+          key: "logging.bodyMode",
+          value: body.bodyMode,
+          logMessage: `logging.bodyMode set to ${body.bodyMode} via admin UI`,
+        });
+      }
+      if (body.retentionDays !== undefined) {
+        if (body.retentionDays !== null && !Number.isInteger(body.retentionDays)) {
+          return sendError(res, 400, "invalid_body", "retentionDays must be null or an integer");
+        }
+        const parsed =
+          body.retentionDays === null
+            ? null
+            : parseLogRetentionDays(String(body.retentionDays));
+        if (parsed === undefined) {
+          return sendError(
+            res,
+            400,
+            "invalid_body",
+            "retentionDays must be null, 0, or a positive integer"
+          );
+        }
+        writes.push({
+          key: "logging.retentionDays",
+          value: parsed === null ? "0" : String(parsed),
+          logMessage: `logging.retentionDays set to ${parsed === null ? "disabled" : parsed} via admin UI`,
+        });
+      }
+      if (writes.length === 0) {
+        return sendError(
+          res,
+          400,
+          "invalid_body",
+          "body must include at least one of: silentRewrite, bodyMode, retentionDays"
+        );
+      }
+      for (const write of writes) {
+        setSetting(write.key, write.value);
+        log.info(write.logMessage);
+      }
       return sendJson(res, 200, { ok: true });
     }
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");

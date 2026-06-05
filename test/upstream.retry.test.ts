@@ -50,6 +50,30 @@ describe("upstream retry / 429 fallback", () => {
     expect(fake).toHaveBeenCalledTimes(3); // initial + 2 retries
   });
 
+  it("uses a larger default retry budget so a sustained 429 still recovers", async () => {
+    // No maxRetries on the cfg and no env override → exercises the built-in
+    // default. A multi-second quota limit must outlast more than the old 3
+    // retries; here the upstream stays 429 for 5 attempts then recovers.
+    let n = 0;
+    const fake = vi.fn(async () => {
+      if (++n < 6) return new Response("rate limited", { status: 429 });
+      return jsonOk();
+    });
+    vi.stubGlobal("fetch", fake);
+    const res = await callOpenAICompat(
+      {
+        baseUrl: baseCfg.baseUrl,
+        apiKey: baseCfg.apiKey,
+        userAgent: baseCfg.userAgent,
+        retryBaseMs: 1, // keep the suite fast; only the COUNT matters here
+      },
+      chat,
+      new AbortController().signal
+    );
+    expect(res.status).toBe(200);
+    expect(fake).toHaveBeenCalledTimes(6); // initial + 5 retries, all within default budget
+  });
+
   it("retries transient 503 then succeeds", async () => {
     let n = 0;
     const fake = vi.fn(async () => (++n === 1 ? new Response("busy", { status: 503 }) : jsonOk()));

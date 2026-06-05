@@ -14,8 +14,24 @@
   },
   "action": {
     "refresh": "刷新",
+    "storage": "存储设置",
     "clearOld": "清理旧日志…",
     "exportCsv": "导出 CSV"
+  },
+  "storage": {
+    "title": "日志存储设置",
+    "saved": "日志存储设置已保存",
+    "cliOverride": "部分字段正由环境变量控制，这里仅展示，不能直接修改。",
+    "bodyMode": {
+      "label": "请求/响应体捕获方式",
+      "full": "捕获全部请求体",
+      "errorsOnly": "仅捕获失败请求",
+      "off": "不捕获请求体"
+    },
+    "retention": {
+      "label": "自动删除多少天之前的日志",
+      "help": "留空表示关闭定期清理。"
+    }
   },
   "clearOld": {
     "title": "清理旧日志",

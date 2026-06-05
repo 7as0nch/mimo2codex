@@ -37,6 +37,18 @@ export const DOC_CATALOG: DocMeta[] = [
     },
   },
   {
+    slug: "codex-cli-isolated-windows",
+    group: "getting-started",
+    title: {
+      en: "Isolated Windows Codex CLI",
+      zh: "Windows 隔离 Codex CLI",
+    },
+    summary: {
+      en: "Let Codex CLI use MiMo on Windows without touching the ~/.codex used by Codex Desktop.",
+      zh: "Windows 下让 Codex CLI 走 MiMo，又不动 Codex 桌面端的 ~/.codex。",
+    },
+  },
+  {
     slug: "docker",
     group: "deployment",
     title: {
@@ -115,6 +127,24 @@ export const DOC_CATALOG: DocMeta[] = [
     summary: {
       en: "Common proxy and network gotchas on macOS and Windows.",
       zh: "macOS 与 Windows 上常见的代理与网络问题。",
+    },
+  },
+  {
+    slug: "connector-plugins",
+    group: "reference",
+    title: { en: "Connector plugins", zh: "Connector 插件" },
+    summary: {
+      en: "Why Codex Desktop connectors (GitHub / Gmail / …) can't be proxied, and the fallback.",
+      zh: "为什么 Codex 桌面端的 connector（GitHub / Gmail …）无法被代理，以及兜底方案。",
+    },
+  },
+  {
+    slug: "community-feedback",
+    group: "reference",
+    title: { en: "Community feedback", zh: "社区反馈" },
+    summary: {
+      en: "Contributor feedback that drove real changes, kept in-tree.",
+      zh: "驱动了实际改动的社区反馈，保留在代码库里。",
     },
   },
   {

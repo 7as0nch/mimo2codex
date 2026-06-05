@@ -6,6 +6,8 @@ import {
   type GenericProviderSpec,
 } from "./generic.js";
 import type { Provider, ProviderModel } from "./types.js";
+import { mimo } from "./mimo.js";
+import { deepseek } from "./deepseek.js";
 import { log } from "../util/log.js";
 
 // File format for ~/.mimo2codex/providers.json:
@@ -168,12 +170,13 @@ function parseSpec(raw: unknown, idx: number): GenericProviderSpec {
             typeof features.dropReasoningEffort === "boolean"
               ? features.dropReasoningEffort
               : undefined,
-          // enhanceErrorPreset 是 string 而非 boolean。当前仅承认 "sensenova" / "minimax"，
+          // enhanceErrorPreset 是 string 而非 boolean。当前承认 "sensenova" / "minimax" / "kimi"，
           // 未知值丢弃以避免无效配置进入运行时（generic.ts 的 enhanceError 会调
           // applyEnhanceErrorPreset，签名是 ProviderPresetId 联合类型）。
           enhanceErrorPreset:
             features.enhanceErrorPreset === "sensenova" ||
-            features.enhanceErrorPreset === "minimax"
+            features.enhanceErrorPreset === "minimax" ||
+            features.enhanceErrorPreset === "kimi"
               ? features.enhanceErrorPreset
               : undefined,
         }
@@ -200,6 +203,12 @@ export function readSpecsFromFile(filePath: string): GenericProviderSpec[] {
 // data that wouldn't load cleanly on restart.
 export function writeSpecsToFile(filePath: string, specs: GenericProviderSpec[]): void {
   const seen = new Set<string>();
+  // `shortcut` shares the providers.shortcut UNIQUE column with the built-ins,
+  // so a generic colliding with mimo/ds (or with another generic) would crash
+  // the next DB seed ("UNIQUE constraint failed: providers.shortcut") and take
+  // admin down (issue #63). Seed the set with the built-in shortcuts and reject
+  // any collision here, at save time, with a friendly message.
+  const shortcutSeen = new Set<string>([mimo.shortcut, deepseek.shortcut]);
   for (const spec of specs) {
     if (!spec || typeof spec !== "object") {
       throw new GenericLoaderError("each provider entry must be an object");
@@ -210,6 +219,14 @@ export function writeSpecsToFile(filePath: string, specs: GenericProviderSpec[])
       );
     }
     seen.add(spec.id);
+    const shortcut = spec.shortcut ?? spec.id;
+    if (shortcutSeen.has(shortcut)) {
+      throw new GenericLoaderError(
+        `provider shortcut "${shortcut}" (provider "${spec.id}") is already taken — ` +
+          `shortcut must be unique across all providers including built-ins (mimo / ds)`
+      );
+    }
+    shortcutSeen.add(shortcut);
     try {
       // Build the Provider to run the same validation the boot path uses.
       // We discard the result — only the side-effect of validation matters.

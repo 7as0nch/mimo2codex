@@ -22,7 +22,9 @@ export interface UpstreamConfig {
   idleTimeoutMs?: number;
   // Transient-failure retry. Defaults come from env
   // (MIMO2CODEX_UPSTREAM_MAX_RETRIES / _RETRY_BASE_MS) when unset. maxRetries
-  // is the number of *extra* attempts after the first (so 3 ⇒ up to 4 tries).
+  // is the number of *extra* attempts after the first (so 6 ⇒ up to 7 tries).
+  // The default budget (6 retries, exp backoff capped at 12s) spans ~28s so a
+  // multi-second quota 429 outlasts the limit instead of bubbling up to Codex.
   maxRetries?: number;
   retryBaseMs?: number;
 }
@@ -108,7 +110,7 @@ function retryDelayMs(res: Response | null, attempt: number, baseMs: number): nu
     }
   }
   const exp = baseMs * 2 ** attempt;
-  return Math.min(exp, 8_000) + Math.floor(Math.random() * 250);
+  return Math.min(exp, 12_000) + Math.floor(Math.random() * 250);
 }
 
 // setTimeout that rejects (AbortError) if the request is cancelled mid-wait,
@@ -196,7 +198,7 @@ async function postUpstream(
   log.debug(`upstream POST ${url}`, { ...meta.summary, apiKey: redactKey(cfg.apiKey) });
   log.debug("upstream POST body", body);
 
-  const maxRetries = cfg.maxRetries ?? envInt("MIMO2CODEX_UPSTREAM_MAX_RETRIES", 3, 0, 6);
+  const maxRetries = cfg.maxRetries ?? envInt("MIMO2CODEX_UPSTREAM_MAX_RETRIES", 6, 0, 12);
   const baseMs = cfg.retryBaseMs ?? envInt("MIMO2CODEX_UPSTREAM_RETRY_BASE_MS", 500, 50, 5_000);
   const serialized = JSON.stringify(body);
 

@@ -62,6 +62,15 @@
     "hint": "「开/关思考」：关闭后所有 provider 都不思考（mimo / deepseek 发 thinking:{type:\"disabled\"}，sensenova / 其他 generic 发 reasoning_effort:\"none\"）。开启时各 provider 走自己的默认行为（多数客户端对非 GPT-5 模型默认不带 reasoning effort，上游可能对简单任务跳过思考）。「强制高强度思考」：仅在「开/关思考」是开时可用，Codex 没明确传 effort 时由 mimo2codex 兜底注入 reasoning_effort=\"high\"；Codex 显式传过的值会被尊重，不被覆盖。修改后立即对新请求生效（无需重启）。",
     "cliOverride": "「开/关思考」当前由 CLI flag (--disable-thinking) 或环境变量 (MIMO2CODEX_DISABLE_THINKING) 控制，开关被锁定。如需用 UI 控制，启动时不要带这些参数。"
   },
+  "visionFallback": {
+    "title": "多模态 Fallback",
+    "scopeNote": "目前仅适配 MiMo 模型，其他 provider/模型暂不适配。",
+    "statusOn": "已启用：图片请求自动切换 vision 模型",
+    "statusOff": "未启用",
+    "hint": "开启后，当请求包含图片但当前模型不支持 vision（如 mimo-v2.5-pro），自动切换到指定的多模态模型（默认 mimo-v2.5），避免图片被静默丢弃。",
+    "modelLabel": "Fallback 模型",
+    "modelPlaceholder": "例如 mimo-v2.5"
+  },
   "targets": {
     "title": "可启用组合",
     "externalWarn": "当前 ~/.codex/auth.json 不是 mimo2codex 写入的（可能是真 OpenAI 登录或其他工具）。点「写入文件并启用」会先自动备份再覆盖，恢复随时可做。",

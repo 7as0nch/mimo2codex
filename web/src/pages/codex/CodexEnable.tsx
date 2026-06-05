@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Collapse,
+  Input,
   Modal,
   Space,
   Switch,
@@ -62,6 +63,10 @@ export function CodexEnable() {
   const [forceHighEffort, setForceHighEffort] = useState<boolean | null>(null);
   const [forceHighEffortSaving, setForceHighEffortSaving] =
     useState<boolean>(false);
+  // visionFallback：多模态 fallback 开关 + 目标模型。null = 加载中。
+  const [visionFallbackEnabled, setVisionFallbackEnabled] = useState<boolean | null>(null);
+  const [visionFallbackModel, setVisionFallbackModel] = useState<string>("mimo-v2.5");
+  const [visionFallbackSaving, setVisionFallbackSaving] = useState<boolean>(false);
 
   async function doProbe(target: CodexTarget) {
     const key = `${target.providerId}::${target.modelId}`;
@@ -93,10 +98,11 @@ export function CodexEnable() {
   async function load() {
     try {
       setError(null);
-      const [s, ts, think] = await Promise.all([
+      const [s, ts, think, vf] = await Promise.all([
         api.codexState(),
         api.codexTargets(),
         api.thinkingState().catch(() => null), // 老后端没此端点时降级
+        api.visionFallback().catch(() => null), // 老后端没此端点时降级
       ]);
       setState(s);
       setTargetsResp(ts);
@@ -104,6 +110,12 @@ export function CodexEnable() {
         setThinkingDisabled(think.effective);
         setThinkingCliOverridden(think.cliOverride !== null);
         setForceHighEffort(think.forceHighEffort);
+      }
+      if (vf) {
+        setVisionFallbackEnabled(vf.enabled);
+        setVisionFallbackModel(vf.model);
+      } else {
+        setVisionFallbackEnabled(false);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -131,6 +143,32 @@ export function CodexEnable() {
       setError((err as Error).message);
     } finally {
       setForceHighEffortSaving(false);
+    }
+  }
+
+  async function doToggleVisionFallback(enabled: boolean): Promise<void> {
+    setVisionFallbackSaving(true);
+    try {
+      await api.setVisionFallback({ enabled });
+      setVisionFallbackEnabled(enabled);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setVisionFallbackSaving(false);
+    }
+  }
+
+  async function doSetVisionFallbackModel(model: string): Promise<void> {
+    const trimmed = model.trim();
+    if (!trimmed || trimmed === visionFallbackModel) return;
+    setVisionFallbackSaving(true);
+    try {
+      await api.setVisionFallback({ model: trimmed });
+      setVisionFallbackModel(trimmed);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setVisionFallbackSaving(false);
     }
   }
 
@@ -525,6 +563,71 @@ export function CodexEnable() {
                           style={{ marginTop: 8 }}
                         />
                       )}
+                    </Card>
+                  )}
+                  {visionFallbackEnabled !== null && (
+                    <Card
+                      size="small"
+                      title={t("visionFallback.title")}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={t("visionFallback.scopeNote")}
+                        style={{ marginBottom: 8 }}
+                      />
+                      <Space wrap>
+                        <Switch
+                          size="small"
+                          checked={!!visionFallbackEnabled}
+                          loading={visionFallbackSaving}
+                          onChange={(enabled) =>
+                            void doToggleVisionFallback(enabled)
+                          }
+                          checkedChildren={t("thinking.switchOn")}
+                          unCheckedChildren={t("thinking.switchOff")}
+                        />
+                        <span>
+                          {visionFallbackEnabled
+                            ? t("visionFallback.statusOn")
+                            : t("visionFallback.statusOff")}
+                        </span>
+                      </Space>
+                      <div style={{ marginTop: 8 }}>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ fontSize: 12 }}
+                        >
+                          {t("visionFallback.modelLabel")}
+                        </Typography.Text>
+                        <Input
+                          size="small"
+                          value={visionFallbackModel}
+                          onChange={(e) =>
+                            setVisionFallbackModel(e.target.value)
+                          }
+                          disabled={!visionFallbackEnabled}
+                          placeholder={t("visionFallback.modelPlaceholder")}
+                          onBlur={(e) =>
+                            void doSetVisionFallbackModel(e.target.value)
+                          }
+                          onPressEnter={() =>
+                            void doSetVisionFallbackModel(visionFallbackModel)
+                          }
+                          style={{ width: 240, marginTop: 4, marginLeft: 4 }}
+                        />
+                      </div>
+                      <Typography.Paragraph
+                        type="secondary"
+                        style={{
+                          fontSize: 12,
+                          marginTop: 8,
+                          marginBottom: 0,
+                        }}
+                      >
+                        {t("visionFallback.hint")}
+                      </Typography.Paragraph>
                     </Card>
                   )}
                   {state && (

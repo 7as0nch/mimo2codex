@@ -17,17 +17,31 @@ mimo2codex 的版本发布历史，按 tag 倒序排列。
 
 ---
 
-## v0.5.21 (upcoming)
+## v0.5.23 (upcoming)
 
-- **[new]** **Admin 插件页一键探测 / 下载编译 / 卸载 adapter（Trope CUA）**：`mimo-computer-use` 卡片新增**桌面后端：Trope CUA**面板。它会探测 adapter 是否真的已安装（在服务端跑插件的 `--doctor`），显示可执行文件路径或缺失的先决条件（git / .NET 10 SDK），并提供**下载并编译** / **重新安装** / **卸载**按钮。由于 Trope CUA 只发布源码，安装会自动 `git clone` + 本地编译，并通过 SSE **实时把构建日志流到 UI**。编译产物装进 **mimo2codex 自己的存储目录**（`~/.mimo2codex/adapters/trope-cua-bin`），不再落到全局 `%LOCALAPPDATA%\Programs\TropeCUA`；安装成功后自动把插件的 `[mcp_servers.*.env]` 指向它（`backend=trope` + `MIMO_COMPUTER_USE_TROPE_CMD`）。卸载调用 Trope CUA 自带的 `uninstall.ps1 -InstallDir …`，对 mimo2codex 目录和旧的全局安装都清理（删二进制 + 清 PATH），随后从 `config.toml` 移除 `MIMO_COMPUTER_USE_TROPE_CMD`——卸载以"清掉受管安装"为成功判据（若配置路径指向的是 mimo2codex 存储之外的手动构建，则给出告警而非判失败，且不自动删除用户自己的目录）。探测/安装只认 mimo2codex 目录里的二进制，因此一次失败的重建不会被误判成功、也不会把过期的外部路径重新写进配置。安装/卸载前还会**先停掉正在运行的 Trope CUA `serve` 守护进程**（它以 `dotnet trope-cua.dll serve` 形式运行，否则会锁住源码/产物目录 → EBUSY /“文件夹正在使用”）；源码拉取遇到残留的非 git 目录会自动清掉重新 clone。编译**不再走 trope 自带的 `build.ps1`**（它的 `dotnet publish … --self-contained:$sc` 冒号写法会被 .NET 10 SDK 误解析成 `RuntimeIdentifier "-Configuration"` → NETSDK1083，必然失败），改为只复用 trope 的 SDK/RID 解析、用干净的 `dotnet publish … --self-contained true` 直接发布到受管目录。适配器安装在 mimo2codex 的**（可能已迁移的）数据目录**下（`<dataDir>/adapters/trope-cua-bin`），不再是固定的用户主目录路径。安装还会**校验产物是否为 self-contained**，是框架依赖版时给出告警（这正是"需要 .NET 10"启动报错的根因）。新增端点 `GET/POST /admin/api/plugins/:id/adapter[/install|/uninstall]`；插件新增 CLI 参数 `--uninstall-adapter`。（`src/admin/router.ts`、`src/codex/plugins.ts`、`plugins/mimo-computer-use/server/lib/installers.mjs`、`web/src/pages/plugins/Plugins.tsx`）
-- **[opt]** **`computer_state` 默认隐藏隐藏窗口（trope 后端）**：适配器把 `computer_state` 映射到 `list_windows` 时默认带 `on_screen_only=true`，于是那些本就常驻的隐藏窗口（如微信的 `WxTrayIconMessageWindow` 托盘消息窗）不再污染结果。模型仍可传 `on_screen_only=false` 看全部。（`plugins/mimo-computer-use/adapters/shared/trope/index.mjs`）
-- **[new]** **新增 `mimo-computer-use` 本地 Codex 插件骨架**：新插件独立放在 `plugins/mimo-computer-use/`，给 MiMo、DeepSeek 以及其它兼容 OpenAI function calling 的模型暴露一组保守的 MCP 电脑控制工具（`computer_state`、`computer_click`、`computer_type`、`computer_key`、`computer_scroll`、`computer_wait`）。它**不改**代理对 `computer_use_preview` 的处理，也不碰现有运行时代码。真实桌面自动化交给单一跨平台 adapter——[Trope CUA](https://github.com/voctory/trope-cua)（macOS / Windows / Linux 通用）；工具结果只返回文本 JSON 摘要 / 截图路径，不把图片塞进 tool result，避免破坏 MiMo / DeepSeek 的历史兼容性。
-- **[new]** **新增 Admin 插件页 + 统一 `MIMO2CODEX_PLUGIN` 环境变量控制**：管理控制台新增独立的**插件**路由，用来管理 mimo2codex 自带的本地 Codex 插件，首个内置项是 `mimo-computer-use`。当 `MIMO2CODEX_PLUGIN` 未设置时，页面可启用/停用插件，并热写 `~/.codex/config.toml` 里的 `[mcp_servers.mimo-computer-use]` 块；当环境变量已设置（`mimo-computer-use` / `computer-use` / `1` / `on` 表示启用，`0` / `off` / `none` 表示禁用）时，env 优先，后台开关自动锁定为只读，方便部署环境保持确定性。插件目录也已纳入 npm 包、Docker 镜像和桌面端 sidecar bundle，保证命令行启动、桌面端、容器部署都能看到同一套内置插件清单。
-- **[new]** **Computer use 首次 adapter 检测与引导安装**：`mimo-computer-use` 现在提供 `npm run doctor`、`npm run install-adapter` 和 MCP 工具 `computer_install_adapter`，统一面向后端 [Trope CUA](https://github.com/voctory/trope-cua)（macOS + Windows）。Trope CUA 以源码分发，安装器会自动 `git clone` 到 `~/.mimo2codex/adapters/trope-cua` 并运行对应平台构建脚本（`install-macos.sh` / `install-windows.ps1 -SelfContained`）；先决条件为 `git` 加 Xcode Command Line Tools（macOS）或 .NET SDK（Windows）。缺少 adapter 时诊断结果会带安装文档；内置的 `mimoskill/scripts/computer_use_setup.py` 也会在 MiMo 电脑操作流程前先检测 / 安装 adapter，再继续控制桌面。`mimoskill/` 已覆盖 npm/source、桌面端 sidecar 和 Docker 镜像三种布局。
-- **[doc]** **新增插件详细说明文档**：新增 `doc/mimo-computer-use-plugin.zh.md`，覆盖插件架构、Admin UI / env 启用、首次 adapter 安装、mimoskill 集成、命令行 / 桌面端 / Docker 打包方式与故障排查。
-- **[doc]** **补齐 `mimo-computer-use` 现有 Codex 环境启用教程**：插件文档现在包含可直接追加到 `~/.codex/config.toml` 的 `[mcp_servers.mimo-computer-use]` 片段、重启步骤、`npm run doctor` 诊断命令、adapter 安装提示，以及第一条用于验证 `computer_state` 的 Codex 提示词。
-- **[fix]** **`mimo-computer-use` MCP server 改用 MCP stdio 标准帧格式（换行分隔 JSON）**：插件 server 之前用 LSP 风格的 `Content-Length` 头给响应分帧，而 Codex（以及它再去拉起的 Python/TS adapter）所用的 MCP stdio 传输并不认这种帧——Codex 收不到 `initialize` 响应，`startup_timeout_sec` 后就丢弃该 server，插件实际不可用。现在 `writeMessage` 输出换行分隔 JSON；`MessageReader` 仍兼容旧的 `Content-Length` 帧以增强健壮性。（`plugins/mimo-computer-use/server/lib/framing.mjs`）
-- **[fix]** **外部 adapter 启动失败不再拖垮插件进程**：`callExternalMcp`（Trope CUA 后端）没有挂 `child.on("error")`，因此 `spawn` 失败（ENOENT / EACCES——例如命令在存在性检查之后失效）会抛出未捕获异常、直接杀死整个 `mimo-computer-use` server，而不是返回错误。现在会立即降级为结构化的 `{ ok: false }` 结果，既不崩溃也不必白等 30 秒请求超时。（`plugins/mimo-computer-use/server/lib/external-mcp-client.mjs`）
+- **[new]** **Windows：隔离的 Codex CLI 启动器**（PR #64，感谢 @Kaiyuan GONG）：新增脚本 `scripts/codex-mimo-isolated.ps1`，让你用 **Codex CLI** 经 mimo2codex 接 MiMo，又**不动 Codex 桌面端常用的 `~/.codex`**。它用独立的 `CODEX_HOME=%USERPROFILE%\.codex-mimo`，首次运行时在那里写入最小的 `auth.json` + `config.toml`，若 `:8788` 没在监听就自动拉起代理，打印本地 API/admin 地址，然后把其余参数原样转发给 `codex`。脚本不硬编码 API key —— 用 `mimo2codex init` 配置。完整说明见 `doc/codex-cli-isolated-windows.zh.md`。
+
+- **[fix]** **保存带重复 shortcut 的 generic provider 不再把后台搞挂（`/admin/` 404）**（issue #63）：`providers.shortcut` 是 `UNIQUE` 列，但保存路径只对 provider `id` 去重、不查 `shortcut`。一个 generic 的 shortcut 撞上内置（`mimo` / `ds`）或撞上另一个 generic 时，保存能成功，却会在**下次启动**的 DB seeding 阶段抛 `UNIQUE constraint failed: providers.shortcut`，再被 cli.ts 的兜底逻辑变成「admin 禁用」—— 于是所有 `/admin/` 请求都 404。两层修复：(1) `writeSpecsToFile` 现在**保存时**就拦下冲突的 shortcut 并给出清晰提示（预置了内置的 shortcut）；(2) DB seeding 按 shortcut 去重（`dedupeProvidersByShortcut`）——重复项**跳过并打 warn**，而不是让整个 seeding 崩掉，这样已经存了脏 `providers.json` 的用户下次启动也能恢复后台。
+
+- **[fix]** **generic provider 的 `enhanceErrorPreset: "kimi"` 不再被静默丢弃**：`kimi` 本就是合法的 `ProviderPresetId`（`src/providers/presets.ts`），但 providers.json 解析器此前只认 `sensenova` / `minimax`，导致 Kimi 的错误诊断预设永远存不下来。现在和其它预设一并承认。
+
+---
+
+## v0.5.22
+
+- **[new]** **多模态 Fallback —— 请求带图片时自动切换到 vision 模型**（PR #58，感谢 @Grub）：当请求包含图片但当前模型看不了图（如 `mimo-v2.5-pro`）时，代理会把 upstream model 改写成支持 vision 的模型（默认 `mimo-v2.5`），避免图片被静默丢弃——Responses 和 Chat 两条路径都生效。**已收敛为 MiMo 专属、不影响其他模型**：vision 能力是 MiMo provider 的特性（`provider.supportsVision`），只有 MiMo 会触发 fallback，DeepSeek / generic 等请求完全不受影响。即便在 MiMo 下，若目标 vision 模型解析不出来也会跳过、保持原模型。开关和目标模型在 admin UI → Codex 接入页的「多模态 fallback」卡片；**默认关闭**——混用 vision / 非 vision 模型时再开。
+
+---
+
+## v0.5.21
+
+- **[fix]** **持续型 429 限流不再中断会话（v0.5.20 重试的补强）**：v0.5.20 加了代理侧的 429/5xx 重试，但默认预算（重试 3 次、约 3.5 秒）只能扛住亚秒级抖动。真正按分钟计的配额限流（`429 Too many requests / limitation`，且经常**不带 `Retry-After` 头**）仍会把预算耗尽，于是原始 429 被透传给 Codex，Codex 再耗尽自己的重试，又报出「exceeded retry limit, last status: 429」。现在默认重试预算放大为：**重试 6 次、指数退避封顶 12 秒（总计约 28 秒）**，让几秒到几十秒的配额限流在放弃前自行解除。仍可被取消、仍尊重上游的 `Retry-After`、仍可通过 `MIMO2CODEX_UPSTREAM_MAX_RETRIES`（上限提到 12）/ `MIMO2CODEX_UPSTREAM_RETRY_BASE_MS` 调整。代价：限流期间单个请求最长会等约 28 秒才失败，而不是原来的约 3.5 秒。
+
+- **[new]** **面向长期运行部署的日志存储控制**：**解决什么问题** —— 以前每次请求/响应都会被完整记录并永久保存，所以在常驻部署（Docker、团队/多人共享）里 `data.db` 会无上限地膨胀：占磁盘、拖慢备份和日志页，还会把完整对话内容留存得比你出于隐私考虑想要的更久。现在有两个旋钮来封顶。`MIMO2CODEX_LOG_BODY_MODE=full|errors-only|off`（日志页 →「存储设置」也能设）可保留全部调试细节、只保留失败请求的 body（够排障、体积小很多）、或完全关闭 body 记录。`MIMO2CODEX_LOG_RETENTION_DAYS=<n>`（同一处）会自动删除超过 `n` 天的旧记录——启动时及运行期间每 6 小时各跑一次；设为 `0` 关闭清理。典型用法：小 VPS / 团队代理设 `errors-only` + `30`，数据库就稳定在可控大小，而不会几个月下来越滚越大。设置存在 DB 里（改完免重启），且 env/CLI 显式设置时优先。
+
+---
+
+## v0.5.20
 
 - **[fix]** **上游 429 / 5xx 瞬时错误不再中断会话（「exceeded retry limit, last status: 429」）**：以前代理会把限流直接透传回 Codex，Codex 用完自己的 `request_max_retries` 就放弃，用户只能手动点「继续」。现在 mimo2codex 自己兜底：`postUpstream` 对 `429` 和 `500/502/503/504`（以及网络连接失败）做指数退避 + 抖动重试，并遵循上游的 `Retry-After` 头（上限 10 秒，避免 Codex 等到超时）。重试可被中断——退避期间 Codex 取消会立即停止。非可重试错误（400/401/403 等）仍快速失败。可通过 `MIMO2CODEX_UPSTREAM_MAX_RETRIES`（默认 3）和 `MIMO2CODEX_UPSTREAM_RETRY_BASE_MS`（默认 500）调整。
 

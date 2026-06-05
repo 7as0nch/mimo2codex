@@ -10,8 +10,107 @@ import { commandExists, runCommand } from "./shell.mjs";
 //   https://github.com/voctory/trope-cua
 const REPO = "https://github.com/voctory/trope-cua";
 
+// Trope's global.json pins the .NET SDK to 10.0.x (rollForward: latestFeature),
+// so on Windows the build needs a .NET 10 SDK. Kept as one constant so the
+// prerequisite check and the user-facing prerequisite strings never drift.
+const REQUIRED_DOTNET_MAJOR = 10;
+
 function detectCmd(env = process.env) {
   return env.MIMO_COMPUTER_USE_TROPE_CMD || "trope-cua";
+}
+
+// Locate a usable `dotnet` the way trope's install-common.ps1 does: prefer
+// DOTNET_ROOT, then %USERPROFILE%\.dotnet, then PATH. Returns the command/path
+// to invoke, or null when none is found.
+async function resolveDotnetCmd(env = process.env, has = commandExists) {
+  const candidates = [];
+  if (env.DOTNET_ROOT) candidates.push(path.join(env.DOTNET_ROOT, "dotnet.exe"));
+  if (env.USERPROFILE) candidates.push(path.join(env.USERPROFILE, ".dotnet", "dotnet.exe"));
+  candidates.push("dotnet");
+  for (const c of candidates) {
+    if (await has(c)) return c;
+  }
+  return null;
+}
+
+// Parse `dotnet --list-sdks` into the set of installed SDK major versions.
+// Returns [] when the probe couldn't run (we then defer to the build rather than
+// block install on a flaky probe).
+async function listDotnetSdkMajors(dotnetCmd, run = runCommand) {
+  const res = await run(dotnetCmd, ["--list-sdks"], { timeoutMs: 15_000 });
+  if (!res.ok) return [];
+  const majors = new Set();
+  for (const line of (res.stdout ?? "").split(/\r?\n/)) {
+    const m = /^(\d+)\.\d+\.\d+/.exec(line.trim());
+    if (m) majors.add(Number(m[1]));
+  }
+  return [...majors];
+}
+
+// Pre-flight dependency check, run BEFORE we clone/build, so a missing toolchain
+// fails fast with an actionable message instead of a cryptic mid-build error.
+// Probes are injectable for testing. Returns { ok, missing: [{name,detail,fix}] }.
+export async function checkPrerequisites(opts = {}) {
+  const env = opts.env ?? process.env;
+  const platform = opts.platform ?? nodePlatform;
+  const has = opts.commandExists ?? commandExists;
+  const run = opts.runCommand ?? runCommand;
+  const requiredMajor = opts.requiredDotnetMajor ?? REQUIRED_DOTNET_MAJOR;
+  const missing = [];
+
+  if (!(await has("git"))) {
+    missing.push({
+      name: "git",
+      detail: "git was not found on PATH.",
+      fix: "Install Git (https://git-scm.com/download/win) and reopen the app, then click Reinstall.",
+    });
+  }
+
+  // Only Windows builds from a .NET SDK; macOS uses Xcode CLT (checked by the
+  // build script itself, since CLT detection requires xcode-select).
+  if (platform === "win32") {
+    const dnLabel = `.NET ${requiredMajor} SDK`;
+    const dnUrl = `https://dotnet.microsoft.com/download/dotnet/${requiredMajor}.0`;
+    const dotnet = await resolveDotnetCmd(env, has);
+    if (!dotnet) {
+      missing.push({
+        name: dnLabel,
+        detail: "dotnet was not found on PATH, DOTNET_ROOT, or %USERPROFILE%\\.dotnet.",
+        fix: `Install the ${dnLabel} (${dnUrl}), then reopen the app and click Reinstall.`,
+      });
+    } else {
+      const majors = await listDotnetSdkMajors(dotnet, run);
+      if (majors.length > 0 && !majors.includes(requiredMajor)) {
+        missing.push({
+          name: dnLabel,
+          detail: `Found .NET SDK major version(s) ${majors.join(", ")} but not ${requiredMajor}.x.`,
+          fix: `Install the ${dnLabel} (${dnUrl}). Existing SDKs are left untouched.`,
+        });
+      }
+      // majors.length === 0 → couldn't enumerate; let the build surface it.
+    }
+  }
+
+  return { ok: missing.length === 0, missing, platform };
+}
+
+// Safety guard for uninstall: every directory we delete MUST be one of Trope
+// CUA's own locations (the cloned source, our managed bin dir, or the legacy
+// Windows install dir) or live under the adapters base. This makes it
+// structurally impossible to remove the user's system/user .NET SDK or any
+// unrelated folder, no matter what a path resolves to.
+export function assertRemovableTropeDir(dir, env = process.env, platform = nodePlatform) {
+  const base = env.MIMO2CODEX_ADAPTERS_DIR || path.join(os.homedir(), ".mimo2codex", "adapters");
+  const norm = (p) => path.resolve(p).toLowerCase();
+  const allowedExact = new Set([
+    norm(path.join(base, "trope-cua")),
+    norm(path.join(base, "trope-cua-bin")),
+    norm(windowsInstallDir(env)),
+  ]);
+  const full = norm(dir);
+  const withinBase = full.startsWith(norm(base) + path.sep);
+  if (allowedExact.has(full) || withinBase) return path.resolve(dir);
+  throw new Error(`refusing to remove non-Trope path during uninstall: ${dir}`);
 }
 
 // Stop any running Trope CUA process before wiping/installing/uninstalling.
@@ -134,7 +233,7 @@ function platformInstaller(platform) {
     return {
       cmd: "powershell",
       args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-      prerequisites: ["git", "PowerShell", ".NET 10 SDK matching global.json"],
+      prerequisites: ["git", "PowerShell", `.NET ${REQUIRED_DOTNET_MAJOR} SDK matching global.json`],
     };
   }
   return null;
@@ -206,17 +305,6 @@ export async function installAdapter(args = {}, env = process.env, platform = no
     };
   }
 
-  if (!(await commandExists("git"))) {
-    return {
-      ok: false,
-      backend: "trope-cua",
-      code: "installer_missing",
-      plan,
-      message:
-        "git is required to fetch Trope CUA source. Install git, then rerun `npm run install-adapter`.",
-    };
-  }
-
   const installer = platformInstaller(platform);
   const timeoutMs = args.timeout_ms ?? 20 * 60 * 1000;
   const dir = sourceDir();
@@ -226,7 +314,27 @@ export async function installAdapter(args = {}, env = process.env, platform = no
   // stdout/stderr as it arrives so the build doesn't look frozen for minutes.
   const onData = typeof args.onProgress === "function" ? args.onProgress : undefined;
 
-  // 0) Stop any running daemon so it can't lock the source/output dirs.
+  // 0a) Pre-flight dependency check BEFORE we clone/build. A missing git or
+  // .NET 10 SDK now fails fast with an actionable message instead of cloning
+  // megabytes of source only to die mid-build with a cryptic error.
+  onData?.("progress: checking prerequisites (git, .NET SDK)...\n");
+  const prereq = await checkPrerequisites({ env, platform });
+  logs.push({ step: "prerequisites", ok: prereq.ok, missing: prereq.missing });
+  if (!prereq.ok) {
+    const summary = prereq.missing.map((m) => `  - ${m.name}: ${m.detail} ${m.fix}`).join("\n");
+    onData?.(`progress: missing prerequisites:\n${summary}\n`);
+    return {
+      ok: false,
+      backend: "trope-cua",
+      code: "prerequisites_missing",
+      missing: prereq.missing,
+      plan,
+      logs,
+      message: `Cannot install Trope CUA — missing prerequisites:\n${summary}`,
+    };
+  }
+
+  // 0b) Stop any running daemon so it can't lock the source/output dirs.
   await stopRunningTropeProcesses(onData, platform);
 
   // 1) Fetch source. Recover from a stale/partial leftover dir (exists but not
@@ -355,6 +463,16 @@ export async function uninstallAdapter(args = {}, env = process.env, platform = 
     const dirs = [installBinDir(), windowsInstallDir(env)];
     const uninstallScript = path.join(src, "scripts", "uninstall.ps1");
     for (const dir of dirs) {
+      // Safety: only ever delete a Trope CUA-owned dir. This guard makes it
+      // impossible to remove the user's .NET SDK/runtime even if a path is
+      // somehow misconfigured upstream.
+      try {
+        assertRemovableTropeDir(dir, env, platform);
+      } catch (e) {
+        onData?.(`progress: SKIP ${dir} (safety guard): ${e.message}\n`);
+        logs.push({ step: "skip-unsafe", dir, ok: false, error: e.message });
+        continue;
+      }
       if (existsSync(uninstallScript)) {
         onData?.(`progress: uninstalling ${dir} via uninstall.ps1...\n`);
         const res = await runCommand(
@@ -385,8 +503,10 @@ export async function uninstallAdapter(args = {}, env = process.env, platform = 
   }
 
   // Drop the cloned source cache so the next install re-clones fresh.
+  // Guarded by the same allowlist so we can never wipe a non-Trope folder.
   if (existsSync(src)) {
     try {
+      assertRemovableTropeDir(src, env, platform);
       rmSync(src, { recursive: true, force: true });
       logs.push({ step: "remove-source", ok: true, dir: src });
     } catch (e) {
@@ -413,7 +533,7 @@ export async function uninstallAdapter(args = {}, env = process.env, platform = 
     logs,
     externalLeftover: external ? detect : null,
     message: external
-      ? `Removed mimo2codex-managed installs and will clear the config path. A separate Trope CUA build still exists at ${detect} (e.g. a manual clone) — delete that folder yourself if you don't want it.`
-      : "Trope CUA uninstalled. Restart your terminal/Codex so the PATH change takes effect.",
+      ? `Removed mimo2codex-managed installs (your system .NET is untouched) and will clear the config path. A separate Trope CUA build still exists at ${detect} (e.g. a manual clone) — delete that folder yourself if you don't want it.`
+      : "Trope CUA uninstalled (only Trope CUA's own files were removed — your system .NET is untouched). Restart your terminal/Codex so the PATH change takes effect.",
   };
 }

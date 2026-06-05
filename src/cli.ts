@@ -88,6 +88,14 @@ OPTIONS
                           native CLI; on by default inside the Docker image).
                           env: MIMO2CODEX_AUTH=on. When on, the first start
                           prints a one-time bootstrap URL.
+      --log-body-mode <mode>
+                          persist request/response bodies in chat_logs:
+                          full | errors-only | off
+                          env: MIMO2CODEX_LOG_BODY_MODE
+      --log-retention-days <n>
+                          auto-delete logs older than <n> days on startup and
+                          periodically while running; use 0 to disable.
+                          env: MIMO2CODEX_LOG_RETENTION_DAYS
   -v, --verbose           log every request (env: MIMO2CODEX_VERBOSE=1)
   -V, --version           print version
   -h, --help              show this help

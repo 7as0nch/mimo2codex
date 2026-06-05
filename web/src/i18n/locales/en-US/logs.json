@@ -14,8 +14,24 @@
   },
   "action": {
     "refresh": "Refresh",
+    "storage": "Storage settings",
     "clearOld": "Clear old logs…",
     "exportCsv": "Export CSV"
+  },
+  "storage": {
+    "title": "Log storage settings",
+    "saved": "Log storage settings saved",
+    "cliOverride": "One or more fields are controlled by environment variables and are read-only here.",
+    "bodyMode": {
+      "label": "Request/response body capture",
+      "full": "Capture all bodies",
+      "errorsOnly": "Capture failed requests only",
+      "off": "Do not capture bodies"
+    },
+    "retention": {
+      "label": "Auto-delete logs older than (days)",
+      "help": "Leave empty to disable scheduled cleanup."
+    }
   },
   "clearOld": {
     "title": "Clear old logs",

@@ -1,6 +1,6 @@
 {
   "name": "mimo2codex",
-  "version": "0.5.21",
+  "version": "0.5.23",
   "description": "Local proxy that lets the latest OpenAI Codex CLI / desktop talk to Xiaomi MiMo (V2.5 Pro) via the Responses API by translating to Chat Completions on the fly.",
   "keywords": [
     "codex",

@@ -59,7 +59,7 @@ function materializeStrippedImage(imageUrl: string, dropDir?: string): string | 
 // only `mimo-v2.5` and `mimo-v2-omni` (and *-omni* variants) accept image
 // input. The other v2.5 variants (mimo-v2.5-pro, mimo-v2-flash, …) return
 // 404 "No endpoints found that support image input" when given image_url parts.
-function modelSupportsImages(model: string): boolean {
+export function modelSupportsImages(model: string): boolean {
   const base = model.toLowerCase();
   if (base.includes("omni")) return true;
   if (base === "mimo-v2.5") return true;

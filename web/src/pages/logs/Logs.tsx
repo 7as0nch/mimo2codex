@@ -24,11 +24,14 @@ import {
   DownloadOutlined,
   ReloadOutlined,
   DeleteOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import {
   api,
+  type LogBodyMode,
   type LogDetail,
+  type LogSettingsResponse,
   type LogRow,
   type ProviderInfo,
 } from "../../api/client";
@@ -90,6 +93,15 @@ export function Logs() {
   // Highlight propagated from ?highlight=<id> in the URL (Dashboard → Logs).
   const [expandedRowKeys, setExpandedRowKeys] = useState<number[]>([]);
   const initialHighlightApplied = useRef(false);
+  const [logSettingsOpen, setLogSettingsOpen] = useState(false);
+  const [logSettingsLoading, setLogSettingsLoading] = useState(false);
+  const [logSettings, setLogSettings] = useState<LogSettingsResponse | null>(
+    null
+  );
+  const [logSettingsForm] = Form.useForm<{
+    bodyMode: LogBodyMode;
+    retentionDays: number | null;
+  }>();
 
   async function loadProviders() {
     try {
@@ -157,6 +169,38 @@ export function Logs() {
         next.delete(id);
         return next;
       });
+    }
+  }
+
+  async function openLogSettings() {
+    setLogSettingsLoading(true);
+    try {
+      const settings = await api.logSettings();
+      setLogSettings(settings);
+      logSettingsForm.setFieldsValue({
+        bodyMode: settings.bodyMode,
+        retentionDays: settings.retentionDays,
+      });
+      setLogSettingsOpen(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLogSettingsLoading(false);
+    }
+  }
+
+  async function saveLogSettings() {
+    const values = await logSettingsForm.validateFields();
+    try {
+      await api.setLogSettings({
+        bodyMode: values.bodyMode,
+        retentionDays: values.retentionDays ?? null,
+      });
+      messageApi.success(t("storage.saved"));
+      setLogSettingsOpen(false);
+      setLogSettings(await api.logSettings());
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
@@ -458,6 +502,13 @@ export function Logs() {
                   <Button icon={<ReloadOutlined />} onClick={() => void load()}>
                     {t("action.refresh")}
                   </Button>
+                  <Button
+                    icon={<SettingOutlined />}
+                    onClick={() => void openLogSettings()}
+                    loading={logSettingsLoading}
+                  >
+                    {t("action.storage")}
+                  </Button>
                   <Button icon={<DownloadOutlined />} onClick={exportCsv}>
                     {t("action.exportCsv")}
                   </Button>
@@ -581,6 +632,52 @@ export function Logs() {
           },
         ]}
       />
+      <Modal
+        title={t("storage.title")}
+        open={logSettingsOpen}
+        onCancel={() => setLogSettingsOpen(false)}
+        onOk={() => void saveLogSettings()}
+        destroyOnClose
+      >
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          {logSettings &&
+          (logSettings.bodyModeCliOverride !== null ||
+            logSettings.retentionDaysCliOverrideActive) ? (
+            <Alert type="info" showIcon message={t("storage.cliOverride")} />
+          ) : null}
+          <Form
+            form={logSettingsForm}
+            layout="vertical"
+            initialValues={{ bodyMode: "full", retentionDays: null }}
+          >
+            <Form.Item label={t("storage.bodyMode.label")} name="bodyMode">
+              <Select
+                disabled={logSettings?.bodyModeCliOverride !== null}
+                options={[
+                  { value: "full", label: t("storage.bodyMode.full") },
+                  {
+                    value: "errors-only",
+                    label: t("storage.bodyMode.errorsOnly"),
+                  },
+                  { value: "off", label: t("storage.bodyMode.off") },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              label={t("storage.retention.label")}
+              name="retentionDays"
+              extra={t("storage.retention.help")}
+            >
+              <InputNumber
+                min={1}
+                max={3650}
+                style={{ width: "100%" }}
+                disabled={logSettings?.retentionDaysCliOverrideActive}
+              />
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
     </>
   );
 }

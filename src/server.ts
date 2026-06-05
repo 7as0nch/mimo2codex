@@ -21,6 +21,7 @@ import type { UserRow } from "./db/users.js";
 import { insertLog, type ChatLogEntry } from "./db/logs.js";
 import { getActiveOverride, type ActiveOverride } from "./db/overrides.js";
 import { getSetting } from "./db/settings.js";
+import { applyLogBodyMode, resolveLogBodyMode, runLogMaintenance } from "./logging/settings.js";
 import { redactSensitive } from "./util/redact.js";
 import { isMaintenance, getMaintenanceMessage } from "./util/maintenance.js";
 
@@ -150,7 +151,16 @@ function recordLog(cfg: Config, entry: Omit<ChatLogEntry, "ts">): void {
   const ts = Date.now();
   setImmediate(() => {
     try {
-      insertLog({ ...entry, ts });
+      const bodies = applyLogBodyMode(resolveLogBodyMode(cfg), entry.status_code, {
+        requestBody: entry.request_body,
+        responseBody: entry.response_body,
+      });
+      insertLog({
+        ...entry,
+        ts,
+        request_body: bodies.requestBody,
+        response_body: bodies.responseBody,
+      });
     } catch (err) {
       log.warn("chat_logs insert failed", { error: (err as Error).message });
     }
@@ -168,7 +178,17 @@ function userLogger(user: UserRow | null): typeof recordLog {
     const ts = Date.now();
     setImmediate(() => {
       try {
-        insertLog({ ...entry, ts, user_id: userId });
+        const bodies = applyLogBodyMode(resolveLogBodyMode(cfg), entry.status_code, {
+          requestBody: entry.request_body,
+          responseBody: entry.response_body,
+        });
+        insertLog({
+          ...entry,
+          ts,
+          user_id: userId,
+          request_body: bodies.requestBody,
+          response_body: bodies.responseBody,
+        });
       } catch (err) {
         log.warn("chat_logs insert failed", { error: (err as Error).message });
       }
@@ -366,6 +386,54 @@ function rewriteWarning(notice: { from: string; to: string; reason: string }): {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Vision (multimodal) fallback
+// ---------------------------------------------------------------------------
+
+// 读取 DB 设置，返回 vision fallback 模型名；未启用或 admin 关闭时返回 null。
+function resolveVisionFallback(cfg: Config): string | null {
+  if (!cfg.adminEnabled) return null;
+  try {
+    if (getSetting("codex.visionFallbackEnabled") !== "1") return null;
+    const model = getSetting("codex.visionFallbackModel");
+    return model || "mimo-v2.5";
+  } catch {
+    return null;
+  }
+}
+
+// 检测 Responses API 请求是否包含图片（input_image 类型）。
+export function requestContainsImages(payload: ResponsesRequest): boolean {
+  if (!Array.isArray(payload.input)) return false;
+  for (const item of payload.input) {
+    if (item.type === "message" && Array.isArray(item.content)) {
+      for (const part of item.content) {
+        if (part.type === "input_image") return true;
+      }
+    }
+    // function_call_output 也可能包含图片（tool 返回的图片）
+    if (item.type === "function_call_output" && Array.isArray(item.output)) {
+      for (const part of item.output) {
+        if (part.type === "input_image") return true;
+      }
+    }
+  }
+  return false;
+}
+
+// 检测 Chat Completions API 请求是否包含图片（image_url 类型）。
+export function chatRequestContainsImages(payload: ChatRequest): boolean {
+  if (!Array.isArray(payload.messages)) return false;
+  for (const msg of payload.messages) {
+    if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === "image_url") return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * 从 Codex 请求的 tools 数组中提取 namespace 映射：toolName → namespaceName。
  * Codex Desktop 期望响应中的 function_call 带 namespace 字段才能路由到正确 handler。
@@ -437,6 +505,40 @@ async function handleResponses(
     cfg,
     readActiveOverrideSafely(cfg)
   );
+  // 多模态 fallback：仅对声明了 vision 能力的 provider（目前只有 MiMo）生效，
+  // 不影响其他 provider/模型。请求含图片但当前 model 看不了图 → 切到 vision 模型。
+  const visionFallbackModel = resolveVisionFallback(cfg);
+  const supportsVision = selectedRaw.provider.supportsVision?.bind(selectedRaw.provider);
+  if (visionFallbackModel && supportsVision) {
+    const effectiveModel = selectedRaw.upstreamModel;
+    if (!supportsVision(effectiveModel) && requestContainsImages(payload)) {
+      const resolved = selectedRaw.provider.resolveModel(visionFallbackModel);
+      // Guard against cross-provider misrouting: only rewrite when the active
+      // provider actually knows this vision model. Otherwise (e.g. DeepSeek
+      // active + default "mimo-v2.5") we'd hand the provider's key to a model
+      // it can't serve. Skip the fallback and keep the original model instead.
+      if (!resolved) {
+        log.warn("vision fallback skipped: active provider can't resolve fallback model", {
+          provider: selectedRaw.provider.id,
+          from: effectiveModel,
+          fallbackModel: visionFallbackModel,
+        });
+      } else {
+        selectedRaw.rewriteNotice = {
+          from: effectiveModel,
+          to: resolved.id,
+          reason: `multimodal fallback — request contains images but model "${effectiveModel}" does not support vision`,
+        };
+        selectedRaw.upstreamModel = resolved.id;
+        selectedRaw.modelInfo = resolved;
+        log.info("vision fallback applied", {
+          from: effectiveModel,
+          to: resolved.id,
+          provider: selectedRaw.provider.id,
+        });
+      }
+    }
+  }
   const { provider, upstreamModel, modelInfo, rewriteNotice } = selectedRaw;
   // BYOK: if a logged-in user has stored their own upstream API key for this
   // provider, swap it into the runtime. Local-mode / shared-key users keep
@@ -1071,6 +1173,40 @@ async function handleChatPassthrough(
     cfg,
     readActiveOverrideSafely(cfg)
   );
+  // 多模态 fallback（chat completions 路径）：仅对声明了 vision 能力的 provider
+  // （目前只有 MiMo）生效，不影响其他 provider/模型。
+  const visionFallbackModel = resolveVisionFallback(cfg);
+  const supportsVision = selectedRaw.provider.supportsVision?.bind(selectedRaw.provider);
+  if (visionFallbackModel && supportsVision) {
+    const effectiveModel = selectedRaw.upstreamModel;
+    if (!supportsVision(effectiveModel) && chatRequestContainsImages(payload)) {
+      const resolved = selectedRaw.provider.resolveModel(visionFallbackModel);
+      // Guard against cross-provider misrouting: only rewrite when the active
+      // provider actually knows this vision model. Otherwise (e.g. DeepSeek
+      // active + default "mimo-v2.5") we'd hand the provider's key to a model
+      // it can't serve. Skip the fallback and keep the original model instead.
+      if (!resolved) {
+        log.warn("vision fallback skipped: active provider can't resolve fallback model", {
+          provider: selectedRaw.provider.id,
+          from: effectiveModel,
+          fallbackModel: visionFallbackModel,
+        });
+      } else {
+        selectedRaw.rewriteNotice = {
+          from: effectiveModel,
+          to: resolved.id,
+          reason: `multimodal fallback — request contains images but model "${effectiveModel}" does not support vision`,
+        };
+        selectedRaw.upstreamModel = resolved.id;
+        selectedRaw.modelInfo = resolved;
+        log.info("vision fallback applied", {
+          from: effectiveModel,
+          to: resolved.id,
+          provider: selectedRaw.provider.id,
+        });
+      }
+    }
+  }
   const { provider, upstreamModel, modelInfo, rewriteNotice } = selectedRaw;
   const { runtime, source: apiKeySource } = resolveRuntimeForUser(
     selectedRaw.runtime,
@@ -1392,6 +1528,20 @@ export function startServer(cfg: Config): Server {
     }
     sendJson(res, 404, errorEnvelope(404, "not_found", `no route for ${req.method} ${url}`));
   });
+
+  if (cfg.adminEnabled) {
+    const maintain = () => {
+      const result = runLogMaintenance(cfg);
+      if (result.removed > 0) {
+        log.info(
+          `log maintenance removed ${result.removed} rows older than ${result.retentionDays} day(s)`
+        );
+      }
+    };
+    maintain();
+    const tid = setInterval(maintain, 6 * 60 * 60 * 1000);
+    server.on("close", () => clearInterval(tid));
+  }
 
   server.listen(cfg.port, cfg.host);
   return server;

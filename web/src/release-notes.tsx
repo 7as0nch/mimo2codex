@@ -14,12 +14,7 @@
 // so the modal stays scannable. We keep ONLY the latest version's entry.
 
 import type { ReactNode } from "react";
-import {
-  CloudDownloadOutlined,
-  DesktopOutlined,
-  FileTextOutlined,
-  ToolOutlined,
-} from "@ant-design/icons";
+import { BugOutlined, WindowsOutlined } from "@ant-design/icons";
 
 export interface BilingualText {
   en: string;
@@ -54,92 +49,40 @@ export interface ReleaseNote {
 // doc/tag-log.{md,zh.md} for users who want the full history.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: "0.5.21",
-    date: "2026-05-30",
+    version: "0.5.23",
+    date: "2026-06-03",
     title: {
-      en: "MiMo Computer Use plugin",
-      zh: "MiMo Computer Use 插件",
+      en: "Windows CLI launcher + provider-config fix",
+      zh: "Windows CLI 启动器 + provider 配置修复",
     },
     summary: {
-      en: "A built-in Codex MCP plugin for local desktop control, with Admin toggles, env locking, adapter detection, and guided install.",
-      zh: "新增内置 Codex MCP 电脑控制插件，支持后台开关、环境变量锁定、adapter 检测与引导安装。",
+      en: "Run Codex CLI in an isolated profile; plus a fix for the admin UI going 404 after saving a provider with a duplicate shortcut.",
+      zh: "用隔离配置跑 Codex CLI；并修复了保存重复 shortcut 的 provider 后后台变 404 的问题。",
     },
     highlights: [
       {
         kind: "new",
-        icon: <CloudDownloadOutlined />,
+        icon: <WindowsOutlined />,
         title: {
-          en: "Install / uninstall the desktop backend from Admin",
-          zh: "在后台一键安装 / 卸载桌面后端",
+          en: "Windows: isolated Codex CLI launcher",
+          zh: "Windows：隔离的 Codex CLI 启动器",
         },
         description: {
-          en: "The Plugins page now detects whether Trope CUA is installed and lets you download & build it (with a live log) or uninstall it — no manual .NET/git wrangling.",
-          zh: "插件页现在能探测 Trope CUA 是否已安装，并支持下载并编译（实时日志）或一键卸载——不用再手动折腾 .NET / git。",
+          en: "Run Codex CLI against MiMo without touching the ~/.codex used by Codex Desktop — a PowerShell script uses a separate CODEX_HOME and auto-starts the proxy.",
+          zh: "用 Codex CLI 经 mimo2codex 接 MiMo，又不动 Codex 桌面端的 ~/.codex——PowerShell 脚本用独立 CODEX_HOME 并自动拉起代理。",
         },
-        location: { en: "Plugins → Desktop backend", zh: "插件 → 桌面后端" },
-        ctaLabel: { en: "Open", zh: "打开" },
-        ctaPath: "/plugins",
-      },
-      {
-        kind: "improved",
-        icon: <DesktopOutlined />,
-        title: {
-          en: "Cleaner window list by default",
-          zh: "默认更干净的窗口列表",
-        },
-        description: {
-          en: "computer_state now hides always-present hidden helper windows by default; pass on_screen_only=false to see everything.",
-          zh: "computer_state 默认隐藏常驻的隐藏辅助窗口；需要看全部时传 on_screen_only=false。",
-        },
-      },
-      {
-        kind: "new",
-        icon: <DesktopOutlined />,
-        title: { en: "MiMo Computer Use plugin", zh: "MiMo Computer Use 插件" },
-        description: {
-          en: "A new isolated Codex MCP plugin lets MiMo-compatible models drive macOS/Windows through detected or guided-installed adapters.",
-          zh: "新增独立 Codex MCP 插件，让 MiMo 兼容模型通过检测或引导安装的 adapter 操控 macOS / Windows。",
-        },
-        location: { en: "plugins/mimo-computer-use", zh: "plugins/mimo-computer-use" },
-      },
-      {
-        kind: "new",
-        icon: <ToolOutlined />,
-        title: { en: "Plugins page + MIMO2CODEX_PLUGIN", zh: "插件页 + MIMO2CODEX_PLUGIN" },
-        description: {
-          en: "Enable built-in plugins from Admin → Plugins, or lock CLI, desktop, and Docker deployments with MIMO2CODEX_PLUGIN.",
-          zh: "可在 Admin → 插件 启用内置插件，也可用 MIMO2CODEX_PLUGIN 锁定命令行、桌面端和 Docker 部署。",
-        },
-        location: { en: "Left nav → Plugins", zh: "左侧导航 → 插件" },
-        ctaLabel: { en: "Open", zh: "打开" },
-        ctaPath: "/plugins",
-      },
-      {
-        kind: "new",
-        icon: <CloudDownloadOutlined />,
-        title: { en: "First-use adapter install", zh: "首次 adapter 检测与安装" },
-        description: {
-          en: "Run npm run doctor / install-adapter (macOS/Windows), or let the MCP tool clone + build the Trope CUA adapter from source with visible progress.",
-          zh: "可运行 npm run doctor / install-adapter（macOS/Windows），也可让 MCP 工具从源码 clone + 构建 Trope CUA adapter 并显示进度。",
-        },
-      },
-      {
-        kind: "doc",
-        icon: <FileTextOutlined />,
-        title: { en: "Detailed plugin guide", zh: "插件详细说明" },
-        description: {
-          en: "New docs cover architecture, Admin/env enablement, mimoskill setup, packaging, and troubleshooting.",
-          zh: "新增文档说明架构、Admin/env 启用、mimoskill 流程、打包方式与故障排查。",
-        },
-        location: { en: "doc/mimo-computer-use-plugin.zh.md", zh: "doc/mimo-computer-use-plugin.zh.md" },
+        location: { en: "scripts/codex-mimo-isolated.ps1", zh: "scripts/codex-mimo-isolated.ps1" },
       },
       {
         kind: "fixed",
-        icon: <ToolOutlined />,
-        title: { en: "Computer Use plugin now talks to Codex", zh: "Computer Use 插件现在能与 Codex 通信" },
+        icon: <BugOutlined />,
+        title: {
+          en: "Saving a provider no longer breaks the admin UI",
+          zh: "shortcut冲突 保存 provider 不再把后台搞挂",
+        },
         description: {
-          en: "The plugin's MCP server now uses the newline-delimited stdio wire format Codex expects (was Content-Length), and external adapter launch failures degrade gracefully instead of crashing the server.",
-          zh: "插件 MCP server 改用 Codex 期望的换行分隔 stdio 帧格式（原为 Content-Length），且外部 adapter 启动失败时优雅降级，不再拖垮 server。",
+          en: "A generic provider whose shortcut collided with a built-in (mimo/ds) or another provider could disable the admin database on the next start (/admin/ 404). It's now rejected at save time, and DB seeding skips duplicates instead of crashing.",
+          zh: "某个 generic provider 的 shortcut 撞上内置（mimo/ds）或其它 provider 时，下次启动会让 admin 数据库不可用（/admin/ 404）。现在保存时就拦下，且 seeding 会跳过重复项而不是崩溃。",
         },
       },
     ],

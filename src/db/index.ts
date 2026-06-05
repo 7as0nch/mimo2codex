@@ -60,6 +60,30 @@ function applyMigrations(db: DB): void {
   }
 }
 
+// Drop providers whose shortcut already appeared (first writer wins). The
+// providers.shortcut column is UNIQUE, so a dirty providers.json carrying a
+// duplicate shortcut would otherwise crash the whole seed transaction with
+// "UNIQUE constraint failed: providers.shortcut" — which the cli.ts catch then
+// turns into a disabled admin (/admin/ 404). Skipping the offender keeps admin
+// alive so the user can fix it. Exported for testing. (issue #63)
+export function dedupeProvidersByShortcut<T extends { id: string; shortcut: string }>(
+  list: readonly T[]
+): { kept: T[]; skipped: Array<{ provider: T; conflictsWith: string }> } {
+  const byShortcut = new Map<string, T>();
+  const kept: T[] = [];
+  const skipped: Array<{ provider: T; conflictsWith: string }> = [];
+  for (const p of list) {
+    const existing = byShortcut.get(p.shortcut);
+    if (existing) {
+      skipped.push({ provider: p, conflictsWith: existing.id });
+    } else {
+      byShortcut.set(p.shortcut, p);
+      kept.push(p);
+    }
+  }
+  return { kept, skipped };
+}
+
 function seedBuiltins(db: DB): void {
   // Provider rows sync source-of-truth fields on every boot — display_name,
   // base_url, default_model and api_key_env are runtime-essential, so the DB
@@ -112,8 +136,15 @@ function seedBuiltins(db: DB): void {
   );
 
   const now = Date.now();
+  const { kept, skipped } = dedupeProvidersByShortcut(PROVIDER_LIST);
+  for (const s of skipped) {
+    log.warn(
+      `provider "${s.provider.id}" skipped during DB seed: shortcut "${s.provider.shortcut}" ` +
+        `already used by "${s.conflictsWith}" — give it a unique shortcut in providers.json`
+    );
+  }
   const tx = db.transaction(() => {
-    for (const p of PROVIDER_LIST) {
+    for (const p of kept) {
       upsertProvider.run({
         id: p.id,
         shortcut: p.shortcut,
