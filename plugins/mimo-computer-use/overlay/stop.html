@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        user-select: none;
+        font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+        -webkit-app-region: drag; /* let the user drag the pill around */
+      }
+      #btn {
+        -webkit-app-region: no-drag;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 138px;
+        height: 36px;
+        margin: 6px;
+        border-radius: 18px;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+        transition: background 160ms ease, transform 120ms ease;
+        background: linear-gradient(180deg, #ff5d5d, #e23b3b);
+      }
+      #btn:active {
+        transform: scale(0.96);
+      }
+      #btn.resumed {
+        background: linear-gradient(180deg, #36d07a, #1fae63);
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="btn"><span class="dot"></span><span id="label">停止 AI 控制</span></div>
+    <script>
+      const { ipcRenderer } = require("electron");
+      const btn = document.getElementById("btn");
+      const label = document.getElementById("label");
+      let stopped = false;
+
+      function render() {
+        if (stopped) {
+          btn.classList.add("resumed");
+          label.textContent = "恢复 AI 控制";
+        } else {
+          btn.classList.remove("resumed");
+          label.textContent = "停止 AI 控制";
+        }
+      }
+      // Allow the main process (global hotkey) to flip our state.
+      window.__setStopped = function (v) {
+        stopped = !!v;
+        render();
+      };
+      btn.addEventListener("click", () => {
+        stopped = !stopped;
+        render();
+        ipcRenderer.send("overlay-control", stopped ? "stop" : "resume");
+      });
+      render();
+    </script>
+  </body>
+</html>

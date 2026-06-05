@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        cursor: none;
+        pointer-events: none;
+        user-select: none;
+      }
+      #cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40px;
+        height: 44px;
+        transform: translate(-100px, -100px);
+        transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+        will-change: transform, opacity;
+        opacity: 0;
+      }
+      /* soft glow halo behind the arrow */
+      #cursor::before {
+        content: "";
+        position: absolute;
+        left: -14px;
+        top: -12px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(80, 230, 255, 0.55) 0%, rgba(80, 230, 255, 0.18) 45%, rgba(80, 230, 255, 0) 70%);
+        filter: blur(2px);
+      }
+      #cursor svg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        filter: drop-shadow(0 0 6px rgba(70, 220, 255, 0.95)) drop-shadow(0 0 14px rgba(70, 220, 255, 0.6));
+      }
+      .ripple {
+        position: absolute;
+        border: 3px solid rgba(90, 230, 255, 0.85);
+        border-radius: 50%;
+        transform: translate(-50%, -50%) scale(0.2);
+        opacity: 0.9;
+        pointer-events: none;
+        animation: ripple 520ms ease-out forwards;
+      }
+      @keyframes ripple {
+        to {
+          transform: translate(-50%, -50%) scale(2.6);
+          opacity: 0;
+          border-width: 1px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cursor">
+      <svg width="40" height="44" viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#bff7ff" />
+            <stop offset="0.5" stop-color="#5fe6ff" />
+            <stop offset="1" stop-color="#22b8e6" />
+          </linearGradient>
+        </defs>
+        <!-- classic pointer; tip at (2,2) so the hotspot ≈ top-left -->
+        <path
+          d="M3 2 L3 31 L11 24 L16 35 L21 33 L16 22 L27 22 Z"
+          fill="url(#g)"
+          stroke="#eafdff"
+          stroke-width="1.6"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
+    <script>
+      const cur = document.getElementById("cursor");
+      let hideTimer = null;
+
+      window.__cursor = function (evt) {
+        if (!evt || typeof evt !== "object") return;
+        if (evt.type === "hide") {
+          cur.style.opacity = "0";
+          return;
+        }
+        const x = Number(evt.x);
+        const y = Number(evt.y);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          // hotspot offset: the arrow tip sits ~3px in from the wrapper origin
+          cur.style.transform = "translate(" + (x - 3) + "px," + (y - 2) + "px)";
+          cur.style.opacity = "1";
+          if (evt.type === "click") spawnRipple(x, y);
+        }
+        // auto-fade if no further actions arrive
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          cur.style.opacity = "0";
+        }, 6000);
+      };
+
+      function spawnRipple(x, y) {
+        const r = document.createElement("div");
+        r.className = "ripple";
+        r.style.left = x + "px";
+        r.style.top = y + "px";
+        r.style.width = "26px";
+        r.style.height = "26px";
+        document.body.appendChild(r);
+        setTimeout(() => r.remove(), 560);
+      }
+    </script>
+  </body>
+</html>

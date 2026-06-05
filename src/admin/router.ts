@@ -5,6 +5,7 @@ import {
   pushComputerUseEvent,
   subscribeComputerUse,
   recentComputerUseEvents,
+  type ComputerUseEvent,
 } from "./computerUseBus.js";
 import { spawn } from "node:child_process";
 import { dirname, extname, join, normalize, resolve } from "node:path";
@@ -1349,7 +1350,7 @@ async function handleApi(ctx: RouteContext): Promise<void> {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
-    const sub = subscribeComputerUse((evt) => {
+    const sub = subscribeComputerUse((evt: ComputerUseEvent) => {
       res.write(`event: action\ndata: ${JSON.stringify(evt)}\n\n`);
     });
     // Replay recent history so a freshly opened panel isn't blank.

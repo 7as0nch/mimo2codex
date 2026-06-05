@@ -1,0 +1,11 @@
+{
+  "title": "插件",
+  "subtitle": "mimo2codex 自带的本地插件，以及社区投稿的适配。",
+  "builtin": "自带",
+  "enableHint": "在 mimo2codex 管理台 → 插件 里启用，并点「安装依赖」即可使用。",
+  "contribute": {
+    "title": "欢迎投稿好玩的插件适配",
+    "desc": "做了有意思的 computer-use / MCP 插件适配？提交到「想法征集」，被收录后就会出现在这里，并同步到 mimo2codex 管理台的插件市场。",
+    "cta": "去投稿"
+  }
+}

@@ -2,6 +2,7 @@ import { chooseAdapter, waitMs } from "./adapters.mjs";
 import { adapterInstallPlan, installAdapter } from "./installers.mjs";
 import { notify } from "./notify.mjs";
 import { isStopped } from "./overlay.mjs";
+import { checkUserTakeover, recordAiCursor, rebaseline } from "./watch.mjs";
 
 // Tools that actually drive the mouse/keyboard — blocked while the user has
 // pressed Stop on the overlay. computer_state / computer_wait stay allowed so
@@ -145,6 +146,24 @@ export async function callTool(name, args = {}) {
       message: "The user pressed Stop on the overlay. Do not keep automating — wait until they ask you to resume (or press Resume).",
     };
   }
+  // Human-takeover watch: if the user moved the mouse since the AI last left it,
+  // pause this action and let the user correct. Re-syncs on the next
+  // computer_state. Skipped while stopped/already handled above.
+  if (ACTION_TOOLS.has(name)) {
+    const takeover = await checkUserTakeover();
+    if (takeover) {
+      notify({ type: "intervened", x: takeover.to.x, y: takeover.to.y });
+      return {
+        ok: false,
+        code: "user_intervened",
+        takeover,
+        message:
+          "⚠️ The user moved the mouse — they may be taking over or correcting you. I've paused. " +
+          "Stop automating, ask the user what they want changed, and call computer_state to re-sync before continuing.",
+      };
+    }
+  }
+
   const adapter = chooseAdapter();
   const handlers = {
     computer_state: "computerState",
@@ -159,6 +178,14 @@ export async function callTool(name, args = {}) {
   }
   const result = await adapter.module[handler](args);
   emit(name, args, result);
+
+  // Maintain the takeover baseline: record where the AI left the cursor after a
+  // move, and re-baseline (clearing any takeover) whenever the AI re-observes.
+  if (result?.ok !== false) {
+    if (name === "computer_click" && Number.isFinite(result?.x)) recordAiCursor(result.x, result.y);
+    else if (name === "computer_scroll" && Number.isFinite(args.x) && Number.isFinite(args.y)) recordAiCursor(args.x, args.y);
+    else if (name === "computer_state") await rebaseline();
+  }
   return result;
 }
 

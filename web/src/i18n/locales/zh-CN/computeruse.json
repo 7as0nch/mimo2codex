@@ -1,0 +1,27 @@
+{
+  "title": "Computer Use 监看",
+  "subtitle": "实时查看 AI 通过 mimo-computer-use 插件对桌面的操作。",
+  "live": "已连接",
+  "offline": "未连接",
+  "clear": "清空",
+  "screen": "屏幕画面",
+  "activity": "操作记录",
+  "waiting": "等待 AI 调用 computer_state 截图…",
+  "noEvents": "暂无操作。让模型调用 computer_* 工具后这里会实时刷新。",
+  "notice": {
+    "title": "无需安装 Electron 也能监看",
+    "desc": "插件每次操作都会把截图与动作推送到这里。蓝色十字是 AI 当前指向的位置，点击会有波纹。装了 Electron 后，真实桌面上还会出现发光光标。"
+  },
+  "paused": {
+    "title": "AI 已暂停 —— 检测到你接管了鼠标",
+    "desc": "AI 发现你移动了鼠标，已停止自动操作。直接在对话里告诉它要怎么改，它会重新截图后再继续。"
+  },
+  "log": {
+    "state": "截图（computer_state）",
+    "click": "点击 ({{x}}, {{y}}) · {{button}}{{dbl}}",
+    "type": "输入 {{chars}} 个字符",
+    "key": "按键 {{key}}",
+    "scroll": "滚动 {{dir}}",
+    "intervened": "用户接管（已暂停）"
+  }
+}

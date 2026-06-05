@@ -1,0 +1,27 @@
+{
+  "title": "Computer Use Monitor",
+  "subtitle": "Watch, in real time, what the AI does to the desktop via the mimo-computer-use plugin.",
+  "live": "Connected",
+  "offline": "Disconnected",
+  "clear": "Clear",
+  "screen": "Screen",
+  "activity": "Activity",
+  "waiting": "Waiting for the AI to call computer_state…",
+  "noEvents": "No actions yet. This updates live once the model calls the computer_* tools.",
+  "notice": {
+    "title": "No Electron needed to watch here",
+    "desc": "The plugin pushes each screenshot and action to this page. The cyan crosshair is where the AI is pointing; clicks ripple. With Electron installed, a glowing cursor also appears on the real desktop."
+  },
+  "paused": {
+    "title": "AI paused — you took over the mouse",
+    "desc": "The AI noticed you moved the mouse and stopped automating. Tell it what to change in the chat; it will re-screenshot and continue."
+  },
+  "log": {
+    "state": "Screenshot (computer_state)",
+    "click": "Click ({{x}}, {{y}}) · {{button}}{{dbl}}",
+    "type": "Typed {{chars}} chars",
+    "key": "Key {{key}}",
+    "scroll": "Scroll {{dir}}",
+    "intervened": "User took over (paused)"
+  }
+}

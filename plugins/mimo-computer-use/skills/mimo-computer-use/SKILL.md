@@ -29,9 +29,11 @@ Workflow:
    plugin and click **Install dependencies** in the admin Plugins page (or run
    `npm run install-adapter`). On macOS, remind them to grant Accessibility +
    Screen Recording to the host app.
-5. You are moving the user's real mouse. If they say stop, stop. If they pressed
-   the overlay Stop button you'll get a `stopped_by_user` error — do not retry
-   until they ask you to resume.
+5. You are moving the user's real mouse. If they say stop, stop. If you get a
+   `stopped_by_user` error (overlay Stop button), do not retry until they ask
+   you to resume. If you get a `user_intervened` error, the user moved the mouse
+   to take over or correct you — STOP automating, ask what they want changed,
+   then call `computer_state` to re-sync before continuing.
 
 Do not use this plugin for shell commands, file writes, process control,
 registry edits, or system settings changes.

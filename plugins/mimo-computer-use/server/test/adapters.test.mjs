@@ -4,6 +4,7 @@ import { chooseAdapter, waitMs } from "../lib/adapters.mjs";
 import { tools } from "../lib/tools.mjs";
 import { adapterInstallPlan, nutInstalled } from "../lib/installers.mjs";
 import { matchTarget } from "../lib/ocr.mjs";
+import { recordAiCursor, checkUserTakeover, rebaseline, isUserInControl } from "../lib/watch.mjs";
 import {
   parseCombo,
   computerClick,
@@ -218,4 +219,24 @@ test("matchTarget prefers exact, then substring, then word-set", () => {
   assert.equal(matchTarget(targets, "cancel").text, "Cancel"); // case-insensitive exact
   assert.equal(matchTarget(targets, "now").text, "Submit form now"); // substring
   assert.equal(matchTarget(targets, "missing"), null);
+});
+
+// --- human-takeover watch ---------------------------------------------------
+
+test("watch detects user mouse takeover and clears on rebaseline", async () => {
+  const fake = { state: { pos: { x: 0, y: 0 } }, mouse: { async getPosition() { return fake.state.pos; } } };
+  __setNutForTests(fake);
+
+  recordAiCursor(100, 100); // AI left the cursor here
+  fake.state.pos = { x: 100, y: 100 };
+  assert.equal(await checkUserTakeover(), null); // cursor unchanged → no takeover
+
+  fake.state.pos = { x: 300, y: 305 }; // user grabbed the mouse
+  const t = await checkUserTakeover();
+  assert.ok(t && t.to.x === 300 && t.to.y === 305);
+  assert.equal(isUserInControl(), true);
+
+  await rebaseline(); // AI re-observes via computer_state
+  assert.equal(isUserInControl(), false);
+  assert.equal(await checkUserTakeover(), null); // baseline is now (300,305)
 });

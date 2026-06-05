@@ -1,0 +1,11 @@
+{
+  "title": "Plugins",
+  "subtitle": "Local plugins shipped with mimo2codex, plus community-contributed adapters.",
+  "builtin": "Built-in",
+  "enableHint": "Enable it in the mimo2codex admin console → Plugins, then click \"Install dependencies\".",
+  "contribute": {
+    "title": "Contribute a fun plugin adapter",
+    "desc": "Built an interesting computer-use / MCP plugin adapter? Submit it under Ideas — once accepted it shows up here and in the mimo2codex admin plugin marketplace.",
+    "cta": "Submit an idea"
+  }
+}
