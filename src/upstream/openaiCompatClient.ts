@@ -18,8 +18,6 @@ export interface UpstreamConfig {
   // Routed model metadata, used to enrich the friendly overflow message with
   // the upstream model id and its context-window cap.
   modelInfo?: { id: string; contextWindow?: number };
-  connectTimeoutMs?: number;
-  idleTimeoutMs?: number;
   // Transient-failure retry. Defaults come from env
   // (MIMO2CODEX_UPSTREAM_MAX_RETRIES / _RETRY_BASE_MS) when unset. maxRetries
   // is the number of *extra* attempts after the first (so 6 ⇒ up to 7 tries).
@@ -86,6 +84,18 @@ function describeFetchError(err: unknown): FetchErrorDetail {
 // 429 is the big one — without proxy-side retry, Codex burns its own
 // `request_max_retries` and surfaces "exceeded retry limit, last status: 429".
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+// undici's timeout error codes (surfaced on err.cause.code). These mean we
+// already WAITED the full headers/body window — retrying just re-sends the
+// (often huge) request and multiplies the dead-air Codex sees, which is what
+// trips its own "stream disconnected before completion". So we fail fast
+// instead of treating them like a quick ECONNREFUSED. Tune the window via
+// MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS / _BODY_TIMEOUT_MS (see proxyDispatcher).
+const TIMEOUT_CAUSE_CODES = new Set([
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
 
 function envInt(name: string, def: number, min: number, max: number): number {
   const raw = process.env[name];
@@ -212,6 +222,25 @@ async function postUpstream(
       res = await doFetch();
     } catch (err) {
       if ((err as Error).name === "AbortError") throw err;
+      const detail = describeFetchError(err);
+      // Timeout class: we already waited the full window. Don't retry — fail
+      // fast with a 504 that names the timeout and points at the env knobs, so
+      // a large-context / image-heavy request degrades cleanly instead of
+      // re-sending the body N times while Codex silently disconnects.
+      if (detail.code && TIMEOUT_CAUSE_CODES.has(detail.code)) {
+        log.warn(`upstream timed out (${detail.code}); not retrying`, detail);
+        throw new UpstreamError({
+          status: 504,
+          code: "upstream_timeout",
+          message:
+            `upstream timed out before responding (${detail.code}). ` +
+            `This usually means the request is too large (long context or a big image) so the model's ` +
+            `first token took longer than the configured window. ` +
+            `请求可能过大（上下文过长或图片过大），上游首字节超时。` +
+            `Raise MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS / _BODY_TIMEOUT_MS (0=off), ` +
+            `or shrink the conversation / image and retry.`,
+        });
+      }
       // Network-level failure (connect refused / DNS / reset). Retry with
       // backoff like a transient status, then give up with a 502.
       if (attempt < maxRetries) {
@@ -224,7 +253,6 @@ async function postUpstream(
         attempt++;
         continue;
       }
-      const detail = describeFetchError(err);
       throw new UpstreamError({
         status: 502,
         code: "upstream_unreachable",

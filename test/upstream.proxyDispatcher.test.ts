@@ -11,11 +11,14 @@ function makeStub(): { fn: (d: Dispatcher) => void; calls: Dispatcher[] } {
 }
 
 describe("installProxyDispatcherFromEnv", () => {
-  it("returns no-env when neither HTTP_PROXY nor HTTPS_PROXY is set", () => {
+  it("returns no-env but still installs a (non-proxy) timeout dispatcher when no proxy env is set", () => {
     const stub = makeStub();
     const status = installProxyDispatcherFromEnv({}, { setDispatcher: stub.fn });
-    expect(status).toEqual({ enabled: false, reason: "no-env" });
-    expect(stub.calls).toHaveLength(0);
+    expect(status).toMatchObject({ enabled: false, reason: "no-env" });
+    // The timeout fix is global — a plain Agent is installed even without a proxy.
+    expect(stub.calls).toHaveLength(1);
+    expect(status.headersTimeoutMs).toBe(600_000);
+    expect(status.bodyTimeoutMs).toBe(600_000);
   });
 
   it("installs dispatcher and returns status when HTTPS_PROXY is set", () => {
@@ -59,7 +62,7 @@ describe("installProxyDispatcherFromEnv", () => {
     expect(status.httpsProxy).toBe("http://upper.local:8080");
   });
 
-  it("opts out completely when MIMO2CODEX_NO_PROXY_FROM_ENV is set, even if HTTPS_PROXY is present", () => {
+  it("opts out of the proxy when MIMO2CODEX_NO_PROXY_FROM_ENV is set, but still installs a timeout dispatcher", () => {
     const stub = makeStub();
     const status = installProxyDispatcherFromEnv(
       {
@@ -68,9 +71,37 @@ describe("installProxyDispatcherFromEnv", () => {
       },
       { setDispatcher: stub.fn }
     );
-    expect(status).toEqual({ enabled: false, reason: "opted-out" });
-    // Critical regression: the opt-out must NOT install a dispatcher.
-    expect(stub.calls).toHaveLength(0);
+    expect(status).toMatchObject({ enabled: false, reason: "opted-out" });
+    // Opt-out disables proxy following, but the global timeout fix still applies
+    // — a plain (non-proxy) Agent is installed.
+    expect(stub.calls).toHaveLength(1);
+  });
+
+  it("reads configurable upstream timeouts from env (0 = disabled)", () => {
+    const stub = makeStub();
+    const status = installProxyDispatcherFromEnv(
+      {
+        MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS: "120000",
+        MIMO2CODEX_UPSTREAM_BODY_TIMEOUT_MS: "0",
+      },
+      { setDispatcher: stub.fn }
+    );
+    expect(status.headersTimeoutMs).toBe(120_000);
+    expect(status.bodyTimeoutMs).toBe(0);
+    expect(stub.calls).toHaveLength(1);
+  });
+
+  it("falls back to the default timeout on a non-numeric/negative env value", () => {
+    const stub = makeStub();
+    const status = installProxyDispatcherFromEnv(
+      {
+        MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS: "not-a-number",
+        MIMO2CODEX_UPSTREAM_BODY_TIMEOUT_MS: "-5",
+      },
+      { setDispatcher: stub.fn }
+    );
+    expect(status.headersTimeoutMs).toBe(600_000);
+    expect(status.bodyTimeoutMs).toBe(600_000);
   });
 
   it("defaults setDispatcher to undici.setGlobalDispatcher when not injected", async () => {

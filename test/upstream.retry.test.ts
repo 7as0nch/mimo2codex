@@ -92,6 +92,33 @@ describe("upstream retry / 429 fallback", () => {
     expect(fake).toHaveBeenCalledTimes(1);
   });
 
+  it("does NOT retry an undici headers-timeout — fails fast with a 504", async () => {
+    const fake = vi.fn(async () => {
+      const err = new Error("fetch failed") as Error & { cause?: { code?: string } };
+      err.cause = { code: "UND_ERR_HEADERS_TIMEOUT" };
+      throw err;
+    });
+    vi.stubGlobal("fetch", fake);
+    await expect(
+      callOpenAICompat(baseCfg, chat, new AbortController().signal)
+    ).rejects.toMatchObject({ status: 504, code: "upstream_timeout" });
+    // The whole point: a timeout is NOT retried (would just re-send a huge body).
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT retry an undici body-timeout either", async () => {
+    const fake = vi.fn(async () => {
+      const err = new Error("terminated") as Error & { cause?: { code?: string } };
+      err.cause = { code: "UND_ERR_BODY_TIMEOUT" };
+      throw err;
+    });
+    vi.stubGlobal("fetch", fake);
+    await expect(
+      callOpenAICompat(baseCfg, chat, new AbortController().signal)
+    ).rejects.toMatchObject({ status: 504, code: "upstream_timeout" });
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
+
   it("retries a network failure then succeeds", async () => {
     let n = 0;
     const fake = vi.fn(async () => {

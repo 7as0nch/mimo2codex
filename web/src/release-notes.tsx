@@ -14,7 +14,7 @@
 // so the modal stays scannable. We keep ONLY the latest version's entry.
 
 import type { ReactNode } from "react";
-import { BugOutlined, WindowsOutlined, DesktopOutlined, ThunderboltOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { BugOutlined } from "@ant-design/icons";
 
 export interface BilingualText {
   en: string;
@@ -49,85 +49,47 @@ export interface ReleaseNote {
 // doc/tag-log.{md,zh.md} for users who want the full history.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: "0.5.23",
-    date: "2026-06-03",
+    version: "0.5.24",
+    date: "2026-06-07",
     title: {
-      en: "Computer Use, now pure Node (no Trope CUA)",
-      zh: "Computer Use 改为纯 Node（不再依赖 Trope CUA）",
+      en: "No more “stream disconnected” on long sessions / images",
+      zh: "长会话 / 图片不再「stream disconnected」断流",
     },
     summary: {
-      en: "The computer-use plugin is rewritten on nut.js — just npm install, no compiler. Optional glowing on-desktop cursor and a live Monitor page. Plus a Windows CLI launcher and a provider-config fix.",
-      zh: "computer-use 插件用 nut.js 重写——npm install 即可，无需编译。可选真实桌面发光光标与实时监看页。另含 Windows CLI 启动器与 provider 配置修复。",
+      en: "Fixes streams disconnecting on large contexts and image uploads, and makes the request-body cap configurable.",
+      zh: "修复大上下文与上传图片导致的断流，并让请求体上限可配置。",
     },
     highlights: [
       {
-        kind: "new",
-        icon: <DesktopOutlined />,
+        kind: "fixed",
+        icon: <BugOutlined />,
         title: {
-          en: "Computer Use rewritten in pure Node (nut.js)",
-          zh: "Computer Use 插件改为纯 Node（nut.js）",
+          en: "Fewer “stream disconnected” drops on big contexts / images",
+          zh: "大上下文 / 图片导致的「stream disconnected」断流更少",
         },
         description: {
-          en: "No more Trope CUA / Xcode / .NET build. nut.js drives mouse, keyboard and screenshots. Vision models act on the screenshot; text-only models act on OCR'd targets with click coordinates.",
-          zh: "不再需要 Trope CUA / Xcode / .NET 编译。nut.js 直接操作鼠标、键盘与截图。视觉模型看截图操作，纯文本模型靠 OCR 文字坐标操作。",
+          en: "Long prefills (large conversations or base64 images) used to outrun Node's 300s upstream timeout, disconnecting the stream. The upstream timeout is now 10 min and configurable, timeouts no longer retry-storm, and the proxy keeps the connection alive with keepalives during prefill.",
+          zh: "长 prefill（大会话或 base64 图片）过去会超过 Node 默认的 300s 上游超时而断流。现在上游超时改为 10 分钟且可配置，超时不再重试风暴，prefill 期间代理用 keepalive 保活连接。",
         },
-        location: { en: "Plugins → MiMo Computer Use", zh: "插件 → MiMo Computer Use" },
-        ctaLabel: { en: "Open Plugins", zh: "打开插件页" },
-        ctaPath: "/plugins",
-      },
-      {
-        kind: "new",
-        icon: <ThunderboltOutlined />,
-        title: {
-          en: "Glowing desktop cursor + live Monitor",
-          zh: "桌面发光光标 + 实时监看页",
+        location: {
+          en: "Tune via MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS / _BODY_TIMEOUT_MS (0 = off)",
+          zh: "可用 MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS / _BODY_TIMEOUT_MS 调整（0 = 关闭）",
         },
-        description: {
-          en: "Optionally install Electron for a glowing cursor + click ripples on the real desktop (with a Stop/Resume control). The new Computer Use Monitor page streams the AI's actions live — no Electron required.",
-          zh: "可选安装 Electron，在真实桌面显示发光光标 + 点击波纹（含停止/恢复按钮）。新的「Computer Use 监看」页实时显示 AI 操作——不装 Electron 也能看。",
-        },
-        location: { en: "Computer Use Monitor (left nav)", zh: "左侧导航 → Computer Use 监看" },
-        ctaLabel: { en: "Open Monitor", zh: "打开监看页" },
-        ctaPath: "/computer-use",
-      },
-      {
-        kind: "improved",
-        icon: <AppstoreOutlined />,
-        title: {
-          en: "Plugins page is now a card marketplace",
-          zh: "插件页改成卡片市场",
-        },
-        description: {
-          en: "Browse plugins as cards and click one for a detail drawer (enable, install deps, open the Monitor). A \"Contribute a plugin\" card links to docweb, which also has a new Plugins page listing the built-in plugin with its version.",
-          zh: "插件以卡片网格浏览，点开右侧详情抽屉（启用、安装依赖、打开监看页）。新增「欢迎投稿插件」卡链接到 docweb——docweb 也有了新的插件页，列出自带插件及其版本号。",
-        },
-        location: { en: "Plugins (left nav)", zh: "左侧导航 → 插件" },
-        ctaLabel: { en: "Open Plugins", zh: "打开插件页" },
-        ctaPath: "/plugins",
-      },
-      {
-        kind: "new",
-        icon: <WindowsOutlined />,
-        title: {
-          en: "Windows: isolated Codex CLI launcher",
-          zh: "Windows：隔离的 Codex CLI 启动器",
-        },
-        description: {
-          en: "Run Codex CLI against MiMo without touching the ~/.codex used by Codex Desktop — a PowerShell script uses a separate CODEX_HOME and auto-starts the proxy.",
-          zh: "用 Codex CLI 经 mimo2codex 接 MiMo，又不动 Codex 桌面端的 ~/.codex——PowerShell 脚本用独立 CODEX_HOME 并自动拉起代理。",
-        },
-        location: { en: "scripts/codex-mimo-isolated.ps1", zh: "scripts/codex-mimo-isolated.ps1" },
       },
       {
         kind: "fixed",
         icon: <BugOutlined />,
         title: {
-          en: "Saving a provider no longer breaks the admin UI",
-          zh: "shortcut冲突 保存 provider 不再把后台搞挂",
+          en: "Large image uploads no longer disconnect",
+          zh: "上传超大图片不再断连",
         },
         description: {
-          en: "A generic provider whose shortcut collided with a built-in (mimo/ds) or another provider could disable the admin database on the next start (/admin/ 404). It's now rejected at save time, and DB seeding skips duplicates instead of crashing.",
-          zh: "某个 generic provider 的 shortcut 撞上内置（mimo/ds）或其它 provider 时，下次启动会让 admin 数据库不可用（/admin/ 404）。现在保存时就拦下，且 seeding 会跳过重复项而不是崩溃。",
+          en: "The request-body cap was a hard-coded 16MB and overflow killed the socket mid-upload (seen by Codex as a connection error). It's now 64MB by default and configurable, and overflow returns a clean 413 instead.",
+          zh: "请求体上限原本硬编码 16MB，超限会在上传途中断开套接字（Codex 看到的是连接错误）。现在默认 64MB 且可配置，超限改为返回干净的 413。",
+        },
+        location: {
+          en: "Tune via MIMO2CODEX_MAX_REQUEST_BODY_MB",
+          zh: "可用 MIMO2CODEX_MAX_REQUEST_BODY_MB 调整",
         },
       },
     ],

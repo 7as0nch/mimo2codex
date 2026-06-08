@@ -3,6 +3,7 @@ import type { Config } from "./config.js";
 import { respToResponses } from "./translate/respToResponses.js";
 import { pipeChatStreamToResponses, type StreamPipelineResult } from "./translate/streamToSse.js";
 import { iterChatStreamChunks } from "./upstream/chatStream.js";
+import { maybeCompactChat, type ChatCaller } from "./translate/autoCompact.js";
 import {
   callOpenAICompat,
   callResponsesPassthrough,
@@ -79,20 +80,91 @@ function resolveSilentRewrite(cfg: Config): boolean {
 
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
-async function readJsonBody<T>(req: IncomingMessage, maxBytes = 16 * 1024 * 1024): Promise<T> {
+// Serialized SSE `error` event used to deliver a terminal failure once the
+// 200 + SSE headers have already been flushed (so we can no longer answer with
+// a JSON 4xx). Codex parses this from the data field like any other event.
+function sseErrorEvent(code: string, message: string): string {
+  return `event: error\ndata: ${JSON.stringify({
+    type: "error",
+    code,
+    message,
+    sequence_number: 9999,
+  })}\n\n`;
+}
+
+// Cheap image-payload summary for logging — counts image parts and sums the
+// length of their (base64/url) strings WITHOUT serializing the whole body, so
+// it stays fast even on multi-MB multimodal requests. Helps diagnose the
+// large-context/image "stream disconnected" reports (issue #65).
+function summarizeChatImages(chat: ChatRequest): { images: number; imageChars: number } {
+  let images = 0;
+  let imageChars = 0;
+  for (const msg of chat.messages ?? []) {
+    if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === "image_url" && part.image_url?.url) {
+          images++;
+          imageChars += part.image_url.url.length;
+        }
+      }
+    }
+  }
+  return { images, imageChars };
+}
+
+// Request-body cap. Multimodal turns (base64 images) can be large, so the old
+// hard-coded 16MB was easy to exceed — and the old overflow path `destroy()`d
+// the socket mid-upload, which Codex saw as a connection reset ("error sending
+// request for url", issue #65) instead of a clean error. Now the cap is
+// configurable (MIMO2CODEX_MAX_REQUEST_BODY_MB, default 64MB) and overflow
+// drains the rest of the body before rejecting, so the caller can answer with a
+// proper 413 the client actually receives.
+function maxRequestBodyBytes(): number {
+  const raw = process.env.MIMO2CODEX_MAX_REQUEST_BODY_MB;
+  const def = 64;
+  const mb = raw ? Number(raw) : def;
+  const safe = Number.isFinite(mb) && mb > 0 ? mb : def;
+  return Math.trunc(safe * 1024 * 1024);
+}
+
+export class RequestBodyTooLargeError extends Error {
+  limitBytes: number;
+  constructor(limitBytes: number) {
+    super(
+      `request body exceeds ${Math.round(limitBytes / (1024 * 1024))}MB limit ` +
+        `(too many or too large images). Reduce/compress images, or raise ` +
+        `MIMO2CODEX_MAX_REQUEST_BODY_MB.`
+    );
+    this.name = "RequestBodyTooLargeError";
+    this.limitBytes = limitBytes;
+  }
+}
+
+async function readJsonBody<T>(req: IncomingMessage, maxBytes = maxRequestBodyBytes()): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     const chunks: Buffer[] = [];
     let total = 0;
+    let overflow = false;
+    // Once we blow the cap, stop buffering (free memory) but keep draining the
+    // socket so the client finishes sending and can RECEIVE our 413 — abruptly
+    // destroying here is exactly what Codex reports as a disconnect. Cap the
+    // drain so a runaway upload still can't waste unbounded time.
+    const drainCeiling = maxBytes * 4;
     req.on("data", (chunk: Buffer) => {
       total += chunk.length;
+      if (overflow) {
+        if (total > drainCeiling) req.destroy();
+        return;
+      }
       if (total > maxBytes) {
-        reject(new Error("request body too large"));
-        req.destroy();
+        overflow = true;
+        chunks.length = 0;
         return;
       }
       chunks.push(chunk);
     });
     req.on("end", () => {
+      if (overflow) return reject(new RequestBodyTooLargeError(maxBytes));
       try {
         const text = Buffer.concat(chunks).toString("utf-8");
         if (!text) return resolve({} as T);
@@ -402,6 +474,64 @@ function resolveVisionFallback(cfg: Config): string | null {
   }
 }
 
+// Auto-compaction config. Resolution order matches the rest of the proxy:
+// CLI/env → admin DB → default. Default ON.
+//
+// The trigger SCALES WITH THE MODEL: by default it's `contextWindow × threshold`
+// (threshold default 0.8), so a 1M-window model compacts near ~800k, a 256k one
+// near ~205k — not at some tiny fixed number. Only summarize when the history is
+// genuinely close to the model's limit; the disconnect itself is already handled
+// by the upstream-timeout + keepalive fixes.
+//
+// If a provider's advertised `contextWindow` OVERSTATES its real usable cap
+// (some upstreams report a big number but 400 earlier), set an absolute trigger
+// with `MIMO2CODEX_AUTO_COMPACT_AT_TOKENS` (or admin `codex.autoCompactAtTokens`).
+// Returns atTokens=null when no trigger can be determined (no override AND
+// unknown window) → compaction is skipped.
+function resolveAutoCompact(
+  cfg: Config,
+  contextWindow?: number
+): { enabled: boolean; atTokens: number | null } {
+  const readNum = (raw: string | null | undefined, pred: (n: number) => boolean): number | null => {
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && pred(n) ? n : null;
+  };
+
+  let threshold = readNum(process.env.MIMO2CODEX_AUTO_COMPACT_THRESHOLD, (n) => n > 0 && n < 1) ?? 0.8;
+  let override = readNum(process.env.MIMO2CODEX_AUTO_COMPACT_AT_TOKENS, (n) => n > 0);
+  if (override !== null) override = Math.trunc(override);
+
+  let enabled: boolean;
+  const envEnabled = process.env.MIMO2CODEX_AUTO_COMPACT;
+  if (envEnabled !== undefined) {
+    enabled = !/^(0|false|off|no)$/i.test(envEnabled);
+  } else if (cfg.adminEnabled) {
+    try {
+      const s = getSetting("codex.autoCompactEnabled");
+      enabled = s === null ? true : s === "1"; // default ON
+      if (override === null) {
+        const t = readNum(getSetting("codex.autoCompactAtTokens"), (n) => n > 0);
+        if (t !== null) override = Math.trunc(t);
+      }
+      const tt = readNum(getSetting("codex.autoCompactThreshold"), (n) => n > 0 && n < 1);
+      if (tt !== null) threshold = tt;
+    } catch {
+      enabled = true;
+    }
+  } else {
+    enabled = true;
+  }
+
+  const atTokens =
+    override !== null
+      ? override
+      : contextWindow && contextWindow > 0
+        ? Math.floor(contextWindow * threshold)
+        : null;
+  return { enabled, atTokens };
+}
+
 // 检测 Responses API 请求是否包含图片（input_image 类型）。
 export function requestContainsImages(payload: ResponsesRequest): boolean {
   if (!Array.isArray(payload.input)) return false;
@@ -467,6 +597,9 @@ async function handleResponses(
   try {
     payload = await readJsonBody<ResponsesRequest>(req);
   } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return sendJson(res, 413, errorEnvelope(413, "request_too_large", err.message));
+    }
     return sendJson(
       res,
       400,
@@ -604,6 +737,35 @@ async function handleResponses(
   const ac = new AbortController();
   req.on("close", () => ac.abort());
 
+  // Auto-compaction: when the estimated input crosses the token trigger,
+  // summarize the older middle of the conversation before forwarding. The
+  // summary goes through the same provider/model via a non-streaming call.
+  // maybeCompactChat is best-effort — it swallows its own summary failures and
+  // leaves the history intact, so this never blocks the real turn.
+  const autoCompact = resolveAutoCompact(cfg, modelInfo?.contextWindow);
+  const callChatForSummary: ChatCaller = async (summaryReq) => {
+    const r = await callOpenAICompat(
+      {
+        baseUrl: runtime.baseUrl,
+        apiKey: runtime.apiKey,
+        userAgent: cfg.userAgent,
+        contextOverflowMode: "passthrough",
+        modelInfo: modelInfo
+          ? { id: modelInfo.id, contextWindow: modelInfo.contextWindow }
+          : { id: upstreamModel },
+        maxRetries: 1,
+      },
+      { ...summaryReq, model: upstreamModel },
+      ac.signal
+    );
+    const j = (await r.json()) as ChatResponse;
+    return j.choices?.[0]?.message?.content ?? "";
+  };
+  const runAutoCompact = async (): Promise<void> => {
+    if (!autoCompact.enabled || autoCompact.atTokens == null) return;
+    await maybeCompactChat(chat, { atTokens: autoCompact.atTokens, callChat: callChatForSummary });
+  };
+
   const startedAt = Date.now();
   const requestBodySnapshot = bodyForLog(payload);
   const rewriteLogFields = rewriteNotice && !resolveSilentRewrite(cfg)
@@ -624,6 +786,7 @@ async function handleResponses(
 
   if (!stream) {
     try {
+      await runAutoCompact();
       const upstreamRes = await callOpenAICompat(
         {
           baseUrl: runtime.baseUrl,
@@ -695,8 +858,30 @@ async function handleResponses(
   }
 
   // Streaming path.
+  // Flush the SSE 200 headers and start the keepalive BEFORE awaiting the
+  // upstream. A slow first token (large context or a big base64 image makes the
+  // prefill long) would otherwise leave Codex staring at a silent socket until
+  // upstream headers arrive, tripping its own idle timeout → "stream
+  // disconnected before completion" (issue #65). The cost: once 200 is on the
+  // wire we can't answer a terminal upstream error with a JSON 4xx anymore, so
+  // pre-stream errors are delivered as an SSE `error` event instead.
+  const imgSummary = summarizeChatImages(chat);
+  if (imgSummary.images > 0) {
+    log.info("streaming request carries images", {
+      upstream_model: upstreamModel,
+      images: imgSummary.images,
+      approx_image_kb: Math.round(imgSummary.imageChars / 1024),
+    });
+  }
+  const sink = makeServerResponseSink(res);
+  const keepalive = setInterval(() => sink.comment("keepalive"), KEEPALIVE_INTERVAL_MS);
+  res.on("close", () => clearInterval(keepalive));
+
   let upstreamRes: Response;
   try {
+    // Runs with the keepalive already active, so the summary round-trip doesn't
+    // re-introduce the silent-socket disconnect we just fixed.
+    await runAutoCompact();
     upstreamRes = await callOpenAICompat(
       {
         baseUrl: runtime.baseUrl,
@@ -712,42 +897,33 @@ async function handleResponses(
       ac.signal
     );
   } catch (err) {
-    if (err instanceof UpstreamError) {
-      sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
-      recordLog(cfg, {
-        ...baseEntry,
-        status_code: err.status,
-        duration_ms: Date.now() - startedAt,
-        prompt_tokens: null,
-        completion_tokens: null,
-        total_tokens: null,
-        error_code: err.code,
-        error_snippet: err.bodySnippet ?? err.message,
-        response_body: null,
-        tool_call_count: null,
-      });
-      return;
+    clearInterval(keepalive);
+    const isUpstream = err instanceof UpstreamError;
+    const status = isUpstream ? (err as UpstreamError).status : 500;
+    const code = isUpstream ? (err as UpstreamError).code : "internal_error";
+    const message = (err as Error).message;
+    if (!isUpstream) {
+      log.error("stream request failed (pre-stream)", { error: message });
     }
-    log.error("stream request failed (pre-stream)", { error: (err as Error).message });
-    sendJson(res, 500, errorEnvelope(500, "internal_error", (err as Error).message));
+    // Headers already flushed → deliver the error over SSE, not as JSON.
+    if (!sink.closed()) {
+      sink.write("error", { type: "error", code, message, sequence_number: 9999 });
+      sink.end();
+    }
     recordLog(cfg, {
       ...baseEntry,
-      status_code: 500,
+      status_code: status,
       duration_ms: Date.now() - startedAt,
       prompt_tokens: null,
       completion_tokens: null,
       total_tokens: null,
-      error_code: "internal_error",
-      error_snippet: (err as Error).message,
+      error_code: code,
+      error_snippet: isUpstream ? ((err as UpstreamError).bodySnippet ?? message) : message,
       response_body: null,
       tool_call_count: null,
     });
     return;
   }
-
-  const sink = makeServerResponseSink(res);
-  const keepalive = setInterval(() => sink.comment("keepalive"), KEEPALIVE_INTERVAL_MS);
-  res.on("close", () => clearInterval(keepalive));
 
   let streamError: Error | null = null;
   let pipeResult: StreamPipelineResult | undefined;
@@ -923,6 +1099,22 @@ async function handleResponsesPassthrough(
   }
 
   // Streaming path: pipe upstream SSE bytes directly to the client.
+  // Same rationale as the translated path — flush 200 + SSE headers and start
+  // the keepalive BEFORE awaiting the upstream so a long prefill (large
+  // context / big image) doesn't leave Codex on a silent socket (issue #65).
+  // Pre-stream errors are therefore emitted as an SSE `error` event.
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
+    (res as unknown as { flushHeaders: () => void }).flushHeaders();
+  }
+  const keepalive = setInterval(() => {
+    if (!res.writableEnded) res.write(": keepalive\n\n");
+  }, KEEPALIVE_INTERVAL_MS);
+  res.on("close", () => clearInterval(keepalive));
+
   let upstreamRes: Response;
   try {
     upstreamRes = await callResponsesPassthrough(
@@ -940,49 +1132,32 @@ async function handleResponsesPassthrough(
       ac.signal
     );
   } catch (err) {
-    if (err instanceof UpstreamError) {
-      sendJson(res, err.status, errorEnvelope(err.status, err.code, err.message));
-      recordLog(cfg, {
-        ...baseEntry,
-        status_code: err.status,
-        duration_ms: Date.now() - startedAt,
-        prompt_tokens: null,
-        completion_tokens: null,
-        total_tokens: null,
-        error_code: err.code,
-        error_snippet: err.bodySnippet ?? err.message,
-        response_body: null,
-        tool_call_count: null,
-      });
-      return;
+    clearInterval(keepalive);
+    const isUpstream = err instanceof UpstreamError;
+    const status = isUpstream ? (err as UpstreamError).status : 500;
+    const code = isUpstream ? (err as UpstreamError).code : "internal_error";
+    const message = (err as Error).message;
+    if (!isUpstream) {
+      log.error("responses passthrough stream pre-request failed", { error: message });
     }
-    log.error("responses passthrough stream pre-request failed", {
-      error: (err as Error).message,
-    });
-    sendJson(res, 500, errorEnvelope(500, "internal_error", (err as Error).message));
+    if (!res.writableEnded) {
+      res.write(sseErrorEvent(code, message));
+      res.end();
+    }
     recordLog(cfg, {
       ...baseEntry,
-      status_code: 500,
+      status_code: status,
       duration_ms: Date.now() - startedAt,
       prompt_tokens: null,
       completion_tokens: null,
       total_tokens: null,
-      error_code: "internal_error",
-      error_snippet: (err as Error).message,
+      error_code: code,
+      error_snippet: isUpstream ? ((err as UpstreamError).bodySnippet ?? message) : message,
       response_body: null,
       tool_call_count: null,
     });
     return;
   }
-
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  const keepalive = setInterval(() => {
-    if (!res.writableEnded) res.write(": keepalive\n\n");
-  }, KEEPALIVE_INTERVAL_MS);
-  res.on("close", () => clearInterval(keepalive));
 
   let streamError: Error | null = null;
   try {
@@ -1002,9 +1177,7 @@ async function handleResponsesPassthrough(
     streamError = err as Error;
     log.error("responses passthrough mid-stream failed", { error: streamError.message });
     if (!res.writableEnded) {
-      res.write(
-        `event: error\ndata: ${JSON.stringify({ type: "error", code: "server_error", message: streamError.message, sequence_number: 9999 })}\n\n`
-      );
+      res.write(sseErrorEvent("server_error", streamError.message));
       res.end();
     }
   } finally {
@@ -1141,6 +1314,9 @@ async function handleChatPassthrough(
   try {
     payload = await readJsonBody<ChatRequest>(req);
   } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return sendJson(res, 413, errorEnvelope(413, "request_too_large", err.message));
+    }
     return sendJson(
       res,
       400,

@@ -21,18 +21,16 @@ const WEB_SEARCH_HINT =
 // https://platform.xiaomimimo.com/docs/zh-CN/api/chat/openai-api `max_completion_tokens`:
 //   pro / v2-pro: 131072  |  v2.5 / omni: 32768  |  flash: 65536
 //
-// contextWindow is advertised as 1M for every model — matching DeepSeek's
-// behavior — so that the generated `model_context_window` in the user's
-// Codex config.toml does NOT make Codex preemptively /compact at 128K
-// (some Codex builds default to 256K and 400 when we declare a smaller
-// cap than they prepare for). MiMo's actual upstream limit per the public
-// docs is 128K for v2.5-pro / v2-pro / v2.5 / v2-omni / v2-flash; if the
-// conversation history truly exceeds that, the upstream still 400s and
-// our `detectContextOverflow` handler surfaces a friendly /compact hint
-// (see src/upstream/contextOverflow.ts). Net effect: more headroom for
-// users whose Codex copy expects larger windows, no silent capability
-// regression at the upstream's real cap.
-const MIMO_ADVERTISED_CONTEXT = 1_000_000;
+// contextWindow is 1M for every model — MiMo's real published context window
+// (NOT a fabricated number; an earlier comment here wrongly claimed the real
+// cap was 128K). Declaring it keeps the generated `model_context_window` in the
+// user's Codex config.toml large enough that Codex doesn't preemptively
+// /compact at a small window (some Codex builds default to 256K and 400 when we
+// declare a smaller cap than they prepare for). If a conversation genuinely
+// exceeds the model's window the upstream 400s and our `detectContextOverflow`
+// handler surfaces a friendly /compact hint (see src/upstream/contextOverflow.ts);
+// mimo2codex's own auto-compaction also kicks in at ~80% of this window first.
+const MIMO_CONTEXT_WINDOW = 1_000_000;
 
 const BUILTIN_MODELS: readonly ProviderModel[] = [
   {
@@ -41,7 +39,7 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     supportsImages: false,
     supportsReasoning: true,
     supportsWebSearch: true,
-    contextWindow: MIMO_ADVERTISED_CONTEXT,
+    contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 131_072,
   },
   {
@@ -50,7 +48,7 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     supportsImages: false,
     supportsReasoning: true,
     supportsWebSearch: true,
-    contextWindow: MIMO_ADVERTISED_CONTEXT,
+    contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 131_072,
   },
   {
@@ -59,7 +57,7 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     supportsImages: true,
     supportsReasoning: true,
     supportsWebSearch: true,
-    contextWindow: MIMO_ADVERTISED_CONTEXT,
+    contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 32_768,
   },
   {
@@ -68,14 +66,14 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     supportsImages: true,
     supportsReasoning: true,
     supportsWebSearch: true,
-    contextWindow: MIMO_ADVERTISED_CONTEXT,
+    contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 32_768,
   },
   {
     id: "mimo-v2-flash",
     displayName: "MiMo V2 Flash",
     supportsImages: false,
-    contextWindow: MIMO_ADVERTISED_CONTEXT,
+    contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 65_536,
   },
 ];

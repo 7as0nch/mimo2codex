@@ -422,6 +422,30 @@ function printStartupBanner(
   // on Apple Terminal stays distinguishable. fg() returns "" at level 0 so
   // pipes / CI / NO_COLOR strip cleanly.
   lines.push(colorProxyLine(proxyStatus));
+  // Upstream read timeouts (undici headersTimeout/bodyTimeout). Surfaced so a
+  // user hitting "stream disconnected before completion" on large contexts /
+  // images can confirm the window and tune it via the env vars.
+  const fmtTimeout = (ms: number): string => (ms === 0 ? "off" : `${Math.round(ms / 1000)}s`);
+  lines.push(
+    `timeouts:    upstream headers ${fmtTimeout(proxyStatus.headersTimeoutMs)} / body ${fmtTimeout(proxyStatus.bodyTimeoutMs)} ` +
+      `(MIMO2CODEX_UPSTREAM_HEADERS_TIMEOUT_MS / _BODY_TIMEOUT_MS, 0=off)`
+  );
+  // Auto-compaction status (env view; admin DB can also toggle per-request).
+  // The trigger scales with each model's context window, so show the rule, not
+  // a single number — unless an absolute override is set.
+  const acEnv = process.env.MIMO2CODEX_AUTO_COMPACT;
+  const acOn = acEnv === undefined ? true : !/^(0|false|off|no)$/i.test(acEnv);
+  const acAtRaw = Number(process.env.MIMO2CODEX_AUTO_COMPACT_AT_TOKENS);
+  const acThrRaw = Number(process.env.MIMO2CODEX_AUTO_COMPACT_THRESHOLD);
+  const acThrPct = Number.isFinite(acThrRaw) && acThrRaw > 0 && acThrRaw < 1 ? Math.round(acThrRaw * 100) : 80;
+  const acTrigger =
+    Number.isFinite(acAtRaw) && acAtRaw > 0
+      ? `at ~${Math.round(acAtRaw / 1000)}k tokens`
+      : `at ~${acThrPct}% of model window`;
+  lines.push(
+    `auto-compact:${acOn ? ` on ${acTrigger}` : " off"} ` +
+      `(MIMO2CODEX_AUTO_COMPACT / _AT_TOKENS / _THRESHOLD)`
+  );
   const mismatch = checkMimoHostMismatch(cfg);
   if (mismatch) {
     lines.push(`⚠ 警告:      ${mismatch}`);
