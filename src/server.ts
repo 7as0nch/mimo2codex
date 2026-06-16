@@ -3,6 +3,7 @@ import type { Config } from "./config.js";
 import { respToResponses } from "./translate/respToResponses.js";
 import { pipeChatStreamToResponses, type StreamPipelineResult } from "./translate/streamToSse.js";
 import { iterChatStreamChunks } from "./upstream/chatStream.js";
+import { runDebate } from "./upstream/debate.js";
 import { maybeCompactChat, type ChatCaller } from "./translate/autoCompact.js";
 import {
   callOpenAICompat,
@@ -13,7 +14,7 @@ import { BUILTIN_PROVIDERS, PROVIDER_LIST, PROVIDERS } from "./providers/registr
 import type { Provider, ProviderModel, ProviderRuntime } from "./providers/types.js";
 import { makeServerResponseSink } from "./util/sse.js";
 import { log } from "./util/log.js";
-import type { ChatRequest, ChatResponse, ChatUsage, ResponsesRequest } from "./translate/types.js";
+import type { ChatMessage, ChatRequest, ChatResponse, ChatUsage, ResponsesRequest } from "./translate/types.js";
 import { handleAdmin } from "./admin/router.js";
 import { authGuard } from "./auth/middleware.js";
 import { resolveRuntimeForUser } from "./auth/byok.js";
@@ -67,6 +68,17 @@ function resolveForceHighEffort(cfg: Config): boolean {
 // silentRewrite 解析：env (cfg.silentRewriteFromCli) > admin settings DB > true。
 // 注意默认是 **静默**（true）—— admin UI 顶部「更多」里有快速开关。每请求调一次，
 // admin 改了立即生效，无需重启。
+// superMode 解析：admin settings DB → false。
+// 启用后，每个请求先由两个模型实例辩论达成共识，再由第三个实例执行。
+function resolveSuperMode(cfg: Config): boolean {
+  if (!cfg.adminEnabled) return false;
+  try {
+    return getSetting("codex.superMode") === "1";
+  } catch {
+    return false;
+  }
+}
+
 function resolveSilentRewrite(cfg: Config): boolean {
   if (cfg.silentRewriteFromCli !== undefined) return cfg.silentRewriteFromCli;
   if (!cfg.adminEnabled) return true;
@@ -768,6 +780,70 @@ async function handleResponses(
 
   const ac = new AbortController();
   req.on("close", () => ac.abort());
+  // --- Super Mode (debate) ---
+  // When enabled, two model instances debate the best approach before the
+  // executor (the normal upstream call) carries out the agreed plan.
+  const superModeEnabled = resolveSuperMode(cfg);
+  if (superModeEnabled) {
+    const taskParts: string[] = [];
+    if (payload.instructions) {
+      taskParts.push("[System Instructions]\n" + payload.instructions.slice(0, 2000));
+    }
+    let charBudget = 3000;
+    for (let i = chat.messages.length - 1; i >= 0 && charBudget > 0; i--) {
+      const m = chat.messages[i];
+      const text = typeof m.content === "string" ? m.content : "";
+      if (!text) continue;
+      const snippet = text.slice(0, Math.min(text.length, charBudget));
+      taskParts.unshift("[" + m.role + "]\n" + snippet);
+      charBudget -= snippet.length;
+    }
+    if (chat.tools && chat.tools.length > 0) {
+      const toolNames = chat.tools
+        .map((t) => ("function" in t && t.function?.name) || ("name" in t && t.name) || "")
+        .filter(Boolean)
+        .join(", ");
+      taskParts.push("[Available Tools]\n" + toolNames);
+    }
+    const taskSummary = taskParts.join("\n\n");
+
+    try {
+      log.info("super mode: starting debate", {
+        model: upstreamModel,
+        messages: chat.messages.length,
+        tools: chat.tools?.length ?? 0,
+      });
+      const debateResult = await runDebate(
+        taskSummary,
+        { runtime, upstreamModel, userAgent: cfg.userAgent },
+        ac.signal,
+      );
+      log.info("super mode: debate complete", {
+        rounds: debateResult.rounds,
+        agreed: debateResult.agreed,
+        consensusLen: debateResult.consensus.length,
+      });
+
+      if (debateResult.consensus) {
+        const consensusMsg: ChatMessage = {
+          role: "system",
+          content:
+            debateResult.consensus +
+            "\n\n[Debate metadata: " + debateResult.rounds + " round(s), " +
+            (debateResult.agreed ? "consensus reached" : "best-effort summary") + "]",
+        };
+        let insertIdx = 0;
+        for (let i = 0; i < chat.messages.length; i++) {
+          if (chat.messages[i].role === "system") insertIdx = i + 1;
+        }
+        chat.messages.splice(insertIdx, 0, consensusMsg);
+      }
+    } catch (err) {
+      log.warn("super mode: debate failed, proceeding without consensus", {
+        error: (err as Error).message,
+      });
+    }
+  }
 
   // Auto-compaction: when the estimated input crosses the token trigger,
   // summarize the older middle of the conversation before forwarding. The

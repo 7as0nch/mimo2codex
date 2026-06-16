@@ -85,6 +85,15 @@
     "modelLabel": "Fallback model",
     "modelPlaceholder": "e.g. mimo-v2.5"
   },
+  "superMode": {
+    "title": "Super Mode",
+    "switchOn": "ON",
+    "switchOff": "OFF",
+    "statusOn": "Super Mode is ON",
+    "statusOff": "Super Mode is OFF",
+    "hint": "When enabled, every request is debated by two model instances with no round limit. An arbitrator judges whether consensus is reached. A third instance then executes the consensus. Debate auto-stops on client disconnect.",
+    "warning": "Super Mode is ON: unlimited debate rounds until the arbitrator declares consensus. Token usage and latency depend on debate complexity. Enable only when high-quality reasoning is needed."
+  },
   "targets": {
     "title": "Available combinations",
     "externalWarn": "Your current ~/.codex/auth.json is a real login (likely Sign in with ChatGPT). 'Write files and enable' now keeps it intact by default and only redirects the model — your ChatGPT login (and OpenAI's official Codex mobile/remote) keeps working. You can still opt to overwrite it in the confirm dialog.",

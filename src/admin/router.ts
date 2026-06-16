@@ -1066,6 +1066,27 @@ async function handleApi(ctx: RouteContext): Promise<void> {
     return sendError(res, 405, "method_not_allowed", "use GET or PUT");
   }
 
+  // GET/PUT /admin/api/super-mode — "Super Mode" debate toggle.
+  // When enabled, every request is first discussed by two model instances
+  // until they reach consensus, then a third instance executes the agreed plan.
+  if (pathname === "/admin/api/super-mode") {
+    if (req.method === "GET") {
+      const enabled = (() => {
+        try { return getSetting("codex.superMode") === "1"; } catch { return false; }
+      })();
+      return sendJson(res, 200, { enabled });
+    }
+    if (req.method === "PUT") {
+      const body = await readJsonBody<{ enabled?: unknown }>(req);
+      if (typeof body.enabled !== "boolean") {
+        return sendError(res, 400, "invalid_body", "enabled (boolean) is required");
+      }
+      setSetting("codex.superMode", body.enabled ? "1" : "0");
+      log.info("codex.superMode set to " + body.enabled + " via admin UI");
+      return sendJson(res, 200, { ok: true });
+    }
+    return sendError(res, 405, "method_not_allowed", "use GET or PUT");
+  }
   // GET/PUT /admin/api/log-settings — quick toggle for the "model fallback
   // applied" rewrite log. Default is silent (suppressed). env
   // MIMO2CODEX_SILENT_REWRITE, when set, overrides and disables the toggle.
