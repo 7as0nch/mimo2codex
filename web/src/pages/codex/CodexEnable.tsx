@@ -69,6 +69,9 @@ export function CodexEnable() {
   const [visionFallbackEnabled, setVisionFallbackEnabled] = useState<boolean | null>(null);
   const [visionFallbackModel, setVisionFallbackModel] = useState<string>("mimo-v2.5");
   const [visionFallbackSaving, setVisionFallbackSaving] = useState<boolean>(false);
+  // superMode
+  const [superModeEnabled, setSuperModeEnabled] = useState<boolean | null>(null);
+  const [superModeSaving, setSuperModeSaving] = useState<boolean>(false);
 
   async function doProbe(target: CodexTarget) {
     const key = `${target.providerId}::${target.modelId}`;
@@ -100,11 +103,12 @@ export function CodexEnable() {
   async function load() {
     try {
       setError(null);
-      const [s, ts, think, vf] = await Promise.all([
+      const [s, ts, think, vf, sm] = await Promise.all([
         api.codexState(),
         api.codexTargets(),
         api.thinkingState().catch(() => null), // 老后端没此端点时降级
         api.visionFallback().catch(() => null), // 老后端没此端点时降级
+        api.superMode().catch(() => null), // 老后端没此端点时降级
       ]);
       setState(s);
       setTargetsResp(ts);
@@ -119,6 +123,7 @@ export function CodexEnable() {
       } else {
         setVisionFallbackEnabled(false);
       }
+      setSuperModeEnabled(sm?.enabled ?? false);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -171,6 +176,19 @@ export function CodexEnable() {
       setError((err as Error).message);
     } finally {
       setVisionFallbackSaving(false);
+    }
+  }
+
+
+  async function doToggleSuperMode(enabled: boolean): Promise<void> {
+    setSuperModeSaving(true);
+    try {
+      await api.setSuperMode(enabled);
+      setSuperModeEnabled(enabled);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSuperModeSaving(false);
     }
   }
 
@@ -447,6 +465,50 @@ export function CodexEnable() {
           ]}
         />
       </div>
+
+      {superModeEnabled !== null && (
+        <Card
+          size="small"
+          style={{
+            marginBottom: 16,
+            border: superModeEnabled ? "1px solid #722ed1" : undefined,
+            background: superModeEnabled
+              ? "linear-gradient(135deg, rgba(114,46,209,0.03), rgba(114,46,209,0.08))"
+              : undefined,
+          }}
+        >
+          <Space wrap align="center">
+            <span style={{ fontWeight: 600 }}>{t("superMode.title")}</span>
+            <Switch
+              size="small"
+              checked={superModeEnabled}
+              loading={superModeSaving}
+              onChange={(enabled) => void doToggleSuperMode(enabled)}
+              checkedChildren={t("superMode.switchOn")}
+              unCheckedChildren={t("superMode.switchOff")}
+            />
+            <span>
+              {superModeEnabled
+                ? t("superMode.statusOn")
+                : t("superMode.statusOff")}
+            </span>
+          </Space>
+          <Typography.Paragraph
+            type="secondary"
+            style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}
+          >
+            {t("superMode.hint")}
+          </Typography.Paragraph>
+          {superModeEnabled && (
+            <Alert
+              type="warning"
+              showIcon
+              message={t("superMode.warning")}
+              style={{ marginTop: 8 }}
+            />
+          )}
+        </Card>
+      )}
 
       <MobileRemoteCard />
 

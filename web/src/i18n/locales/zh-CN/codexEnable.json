@@ -85,6 +85,15 @@
     "modelLabel": "Fallback 模型",
     "modelPlaceholder": "例如 mimo-v2.5"
   },
+  "superMode": {
+    "title": "超能模式",
+    "switchOn": "开",
+    "switchOff": "关",
+    "statusOn": "超能模式已开启",
+    "statusOff": "超能模式已关闭",
+    "hint": "开启后，每个请求先由两个模型实例就最佳执行方案进行辩论，不设轮次上限。由仲裁官判断是否达成共识。共识注入第三个实例执行。请求断开时辩论自动终止。",
+    "warning": "超能模式已开启：辩论轮次不设上限，直到仲裁官判定共识才执行。token 消耗和延迟取决于辩论复杂度，可能显著增加。仅在需要高质量推理时开启。"
+  },
   "targets": {
     "title": "可启用组合",
     "externalWarn": "当前 ~/.codex/auth.json 是真实登录（很可能是 Sign in with ChatGPT）。现在点「写入文件并启用」默认会保留它不动，只把模型重定向 —— 你的 ChatGPT 登录（以及 OpenAI 官方的 Codex 手机端/远程）继续可用。如确需覆盖，可在确认弹窗里勾选。",
