@@ -770,6 +770,7 @@ async function handleResponses(
   const chat = provider.preprocessResponses(payload, {
     runtime,
     exposeReasoning: cfg.exposeReasoning,
+      reasoningEffort: modelInfo?.reasoningEffort,
     dataDir: cfg.dataDir,
     disableThinking: resolveDisableThinking(cfg),
     forceHighEffort: resolveForceHighEffort(cfg),

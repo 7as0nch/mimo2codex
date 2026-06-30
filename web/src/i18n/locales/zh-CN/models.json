@@ -14,7 +14,8 @@
       "context": "上下文",
       "source": "来源",
       "deprecated": "过期日",
-      "ops": "操作"
+      "ops": "操作",
+      "reasoningEffort": "思考深度"
     },
     "capability": {
       "vision": "视觉",
@@ -35,7 +36,9 @@
     "title": "新增自定义模型",
     "upstreamPlaceholder": "upstream_id（如 deepseek-v4-mini）",
     "displayNamePlaceholder": "显示名（可选）",
-    "submit": "添加"
+    "submit": "添加",
+    "reasoningEffortPlaceholder": "思考深度",
+    "reasoningEffortDefault": "默认 (提供商)"
   },
   "deleteConfirm": "删除该自定义模型？"
 }

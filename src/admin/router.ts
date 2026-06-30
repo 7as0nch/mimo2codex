@@ -1244,7 +1244,7 @@ async function handleApi(ctx: RouteContext): Promise<void> {
     }
     if (req.method === "POST") {
       const body = await readJsonBody<
-        Partial<{ upstream_id: string; display_name: string; context_window: number | null }>
+        Partial<{ upstream_id: string; display_name: string; context_window: number | null; reasoning_effort: string | null }>
       >(req);
       if (!body.upstream_id) return sendError(res, 400, "missing_upstream_id", "upstream_id required");
       // Default new user-added models to a 1M context window — matches the
@@ -1259,6 +1259,7 @@ async function handleApi(ctx: RouteContext): Promise<void> {
           upstream_id: body.upstream_id,
           display_name: body.display_name,
           context_window: contextWindow,
+          reasoning_effort: body.reasoning_effort,
         });
         return sendJson(res, 201, { model: row });
       } catch (err) {

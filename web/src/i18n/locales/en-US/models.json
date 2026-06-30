@@ -14,7 +14,8 @@
       "context": "Context",
       "source": "Source",
       "deprecated": "Deprecated after",
-      "ops": "Actions"
+      "ops": "Actions",
+      "reasoningEffort": "Reasoning"
     },
     "capability": {
       "vision": "vision",
@@ -35,7 +36,9 @@
     "title": "Add a custom model",
     "upstreamPlaceholder": "upstream_id (e.g. deepseek-v4-mini)",
     "displayNamePlaceholder": "display name (optional)",
-    "submit": "Add"
+    "submit": "Add",
+    "reasoningEffortPlaceholder": "reasoning effort",
+    "reasoningEffortDefault": "Default (provider)"
   },
   "deleteConfirm": "Delete this custom model?"
 }

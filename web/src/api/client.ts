@@ -87,6 +87,7 @@ export interface GenericProviderModelSpec {
   contextWindow?: number;
   maxOutputTokens?: number;
   deprecatedAfter?: string;
+  reasoningEffort?: string;
 }
 
 export interface GenericProviderSpec {
@@ -167,6 +168,7 @@ export interface ModelRow {
   context_window: number | null;
   is_builtin: number;
   deprecated_after: string | null;
+  reasoning_effort: string | null;
   sort_order: number;
 }
 

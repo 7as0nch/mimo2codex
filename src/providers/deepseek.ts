@@ -14,6 +14,7 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     id: "deepseek-v4-pro",
     displayName: "DeepSeek V4 Pro",
     supportsReasoning: true,
+    reasoningEffort: "max",
     contextWindow: DEEPSEEK_CONTEXT,
   },
   {
@@ -21,6 +22,7 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     displayName: "DeepSeek V4 Flash",
     aliases: ["deepseek-chat", "deepseek-reasoner"],
     supportsReasoning: true,
+    reasoningEffort: "max",
     contextWindow: DEEPSEEK_CONTEXT,
   },
   {
@@ -76,7 +78,7 @@ export const deepseek: Provider = {
     // DeepSeek doesn't recognize it. The structured `thinking: {type: ...}`
     // field IS what DeepSeek wants and is preserved below.
     delete chat.enable_thinking;
-    normalizeDeepseekBody(chat);
+    normalizeDeepseekBody(chat, ctx.reasoningEffort);
     // The V4 family REQUIRES `reasoning_content` to be echoed back on every
     // prior assistant message in thinking mode (400: "The reasoning_content
     // in the thinking mode must be passed back to the API"). reqToChat
@@ -98,7 +100,7 @@ export const deepseek: Provider = {
       // normalizeDeepseekBody 内部已经在 thinking:disabled + reasoning_effort:"none"
       // 时 strip 那个字段，作为兜底（也清掉客户端可能误传的）。
     }
-    normalizeDeepseekBody(out);
+    normalizeDeepseekBody(out, ctx.reasoningEffort);
     if (isLegacyR1Model(out.model)) {
       out.messages = out.messages.map(cloneWithoutReasoning);
     }
@@ -126,7 +128,7 @@ function isLegacyR1Model(model: string): boolean {
 //   - In thinking mode, `temperature` / `top_p` / `presence_penalty` /
 //     `frequency_penalty` are silently ignored upstream; strip them client-side
 //     so the request matches the eventual behavior.
-function normalizeDeepseekBody(chat: ChatRequest): void {
+function normalizeDeepseekBody(chat: ChatRequest, reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max"): void {
   if (chat.thinking === undefined) {
     chat.thinking = { type: "enabled" };
   }
@@ -138,7 +140,7 @@ function normalizeDeepseekBody(chat: ChatRequest): void {
       delete chat.reasoning_effort;
     }
   } else if (chat.reasoning_effort === undefined) {
-    chat.reasoning_effort = "high";
+    chat.reasoning_effort = reasoningEffort ?? "high";
   }
   if (chat.thinking?.type === "enabled") {
     delete chat.temperature;

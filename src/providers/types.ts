@@ -18,6 +18,8 @@ export interface ProviderModel {
   displayName?: string;
   supportsImages?: boolean;
   supportsReasoning?: boolean;
+  // Per-model reasoning effort. "max" forces the highest thinking budget.
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   supportsWebSearch?: boolean;
   contextWindow?: number;
   // Optional per-model output cap. Used by cli.ts when emitting
@@ -49,6 +51,7 @@ export interface PreprocessCtx {
   // pass the path to mimoskill/scripts/ocr.py. Empty/undefined → falls back
   // to os.tmpdir() inside reqToChat. Typically `cfg.dataDir`.
   dataDir?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   // 全局"关思考"开关：CLI --disable-thinking / env / admin UI 控制。
   // 各 provider 自己决定怎么落地到上游字段（mimo/deepseek: thinking:{type:"disabled"}；
   // sensenova/generic: reasoning_effort:"none"）。reqToChat 一并设两个，由 generic

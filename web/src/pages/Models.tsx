@@ -149,6 +149,15 @@ export function Models() {
         render: (v: number | null) => v?.toLocaleString() ?? "—",
       },
       {
+        title: t("list.columns.reasoningEffort"),
+        dataIndex: "reasoning_effort",
+        key: "reasoning_effort",
+        render: (v: string | null) =>
+          v ? (
+            <Tag color={v === "max" ? "red" : v === "xhigh" ? "orange" : "blue"}>{v}</Tag>
+          ) : "—",
+      },
+      {
         title: t("list.columns.source"),
         dataIndex: "is_builtin",
         key: "is_builtin",

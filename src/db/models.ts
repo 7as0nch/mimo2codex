@@ -12,6 +12,7 @@ export interface ModelRow {
   context_window: number | null;
   is_builtin: number;
   deprecated_after: string | null;
+  reasoning_effort: string | null;
   sort_order: number;
 }
 
@@ -38,6 +39,7 @@ export interface ModelInput {
   supports_web_search?: boolean;
   context_window?: number | null;
   deprecated_after?: string | null;
+  reasoning_effort?: string | null;
   sort_order?: number;
 }
 
@@ -47,11 +49,11 @@ export function insertCustomModel(providerId: ProviderId, input: ModelInput): Mo
       `INSERT INTO models (
         provider_id, upstream_id, display_name,
         supports_images, supports_reasoning, supports_web_search,
-        context_window, is_builtin, deprecated_after, sort_order
+        context_window, is_builtin, deprecated_after, reasoning_effort, sort_order
       ) VALUES (
         @provider_id, @upstream_id, @display_name,
         @supports_images, @supports_reasoning, @supports_web_search,
-        @context_window, 0, @deprecated_after, @sort_order
+        @context_window, 0, @deprecated_after, @reasoning_effort, @sort_order
       )`
     )
     .run({
@@ -63,6 +65,7 @@ export function insertCustomModel(providerId: ProviderId, input: ModelInput): Mo
       supports_web_search: input.supports_web_search ? 1 : 0,
       context_window: input.context_window ?? null,
       deprecated_after: input.deprecated_after ?? null,
+      reasoning_effort: input.reasoning_effort ?? null,
       sort_order: input.sort_order ?? 100,
     });
   return getModelById(Number(info.lastInsertRowid))!;
@@ -99,6 +102,8 @@ export function patchModel(id: number, patch: Partial<ModelInput>): ModelRow | n
       patch.context_window === undefined ? existing.context_window : patch.context_window,
     deprecated_after:
       patch.deprecated_after === undefined ? existing.deprecated_after : patch.deprecated_after,
+    reasoning_effort:
+      patch.reasoning_effort === undefined ? existing.reasoning_effort : patch.reasoning_effort,
     sort_order: patch.sort_order ?? existing.sort_order,
   };
   getDb()
@@ -111,6 +116,7 @@ export function patchModel(id: number, patch: Partial<ModelInput>): ModelRow | n
         supports_web_search = @supports_web_search,
         context_window = @context_window,
         deprecated_after = @deprecated_after,
+        reasoning_effort = @reasoning_effort,
         sort_order = @sort_order
       WHERE id = @id`
     )
