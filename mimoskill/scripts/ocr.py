@@ -3,7 +3,7 @@
 ocr.py — OCR / image recognition that works without any API key.
 
 Use this when the surrounding chat model can't see images (mimo-v2.5-pro,
-mimo-v2-flash, deepseek-*, or any text-only model).
+deepseek-*, or any text-only model).
 
 Engines (--engine):
   auto          (default) — mimo if MIMO_API_KEY set, else tesseract if
@@ -163,19 +163,31 @@ def resolve_image_arg(arg: str) -> str:
 
 # --- model auto-select ------------------------------------------------------
 
+# MiMo retired its v2 generation (offline 2026-06-30). This script calls MiMo
+# directly (no proxy alias layer), so the old names 400 upstream — coerce them
+# to their live replacement. `mimo-v2.5` is now the sole vision model.
+RETIRED_MIMO_MODELS = {"mimo-v2-omni", "mimo-v2-flash", "mimo-v2-pro"}
+
+
 def model_supports_images(model: str) -> bool:
-    """Mirror src/translate/reqToChat.ts:modelSupportsImages."""
+    """Vision-capable MiMo model check — `mimo-v2.5` is now the only one.
+
+    (src/translate/reqToChat.ts keeps a defensive `*-omni` branch behind the
+    proxy's alias layer; this standalone script has no alias layer, so a retired
+    omni name would 400 upstream — see pick_model's RETIRED_MIMO_MODELS coercion.)
+    """
     base = model.split("[", 1)[0].lower()
-    if "omni" in base:
-        return True
-    if base == "mimo-v2.5":
-        return True
-    return False
+    return base == "mimo-v2.5"
 
 
 def pick_model(cli_model: str | None) -> tuple[str, str | None]:
     """Returns (chosen_model, note_for_stderr_or_None)."""
     if cli_model:
+        if cli_model in RETIRED_MIMO_MODELS:
+            return "mimo-v2.5", (
+                f"note: model '{cli_model}' is retired; "
+                f"using mimo-v2.5 (the current vision model) for this call.\n"
+            )
         if model_supports_images(cli_model):
             return cli_model, None
         return "mimo-v2.5", (

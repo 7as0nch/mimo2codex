@@ -287,44 +287,51 @@ describe("mimo provider preprocessResponses retains MiMo specifics", () => {
     expect(assistantWithReasoning!.reasoning_content).toBe("I should call search");
   });
 
-  it("M2: injects thinking.enabled for v2.5-pro / v2.5 / v2-pro / omni", () => {
-    for (const model of ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-pro", "mimo-v2-omni"]) {
-      const chat = mimo.preprocessResponses({ model, input: "hi" }, mimoCtx);
+  it("M2: injects thinking.enabled for all live reasoning models", () => {
+    for (const model of ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2.5-pro-ultraspeed"]) {
+      const chat = mimo.preprocessResponses(
+        { model, input: "hi" },
+        { ...mimoCtx, upstreamModel: model }
+      );
       expect(chat.thinking?.type, `${model} should default to thinking.enabled`).toBe("enabled");
     }
   });
 
-  it("M2: does NOT inject thinking for mimo-v2-flash (upstream default disabled)", () => {
-    const chat = mimo.preprocessResponses({ model: "mimo-v2-flash", input: "hi" }, mimoCtx);
-    expect(chat.thinking).toBeUndefined();
+  it("M2: retired mimo-v2-flash aliases to mimo-v2.5 and now DEFAULTS thinking enabled", () => {
+    // Behavior change from the v2 retirement: flash used to default thinking
+    // OFF, but its official replacement mimo-v2.5 defaults thinking ON. The
+    // client still sends the old name; upstream is the aliased v2.5, so the
+    // v2.5 default applies (normalization keys off ctx.upstreamModel).
+    const chat = mimo.preprocessResponses(
+      { model: "mimo-v2-flash", input: "hi" },
+      { ...mimoCtx, upstreamModel: "mimo-v2.5" }
+    );
+    expect(chat.thinking?.type).toBe("enabled");
   });
 
-  it("M3: strips temperature on mimo-v2.5-pro when thinking is enabled", () => {
+  it("M3: strips temperature AND top_p on the v2.5 family when thinking is enabled", () => {
+    for (const model of ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2.5-pro-ultraspeed"]) {
+      const chat = mimo.preprocessResponses(
+        { model, input: "hi", temperature: 0.5, top_p: 0.7 },
+        { ...mimoCtx, upstreamModel: model }
+      );
+      expect(chat.thinking?.type).toBe("enabled");
+      expect(chat.temperature, `${model} temperature stripped`).toBeUndefined();
+      expect(chat.top_p, `${model} top_p stripped`).toBeUndefined();
+    }
+  });
+
+  it("M3: retired mimo-v2-pro aliases to mimo-v2.5-pro and strips temperature/top_p", () => {
+    // The old "v2-pro keeps its temperature" behavior is gone — v2-pro now
+    // resolves to mimo-v2.5-pro, which forces temperature:1.0 / top_p:0.95 in
+    // thinking mode, so we strip both.
     const chat = mimo.preprocessResponses(
-      { model: "mimo-v2.5-pro", input: "hi", temperature: 0.5 },
-      mimoCtx
+      { model: "mimo-v2-pro", input: "hi", temperature: 0.3, top_p: 0.7 },
+      { ...mimoCtx, upstreamModel: "mimo-v2.5-pro" }
     );
     expect(chat.thinking?.type).toBe("enabled");
     expect(chat.temperature).toBeUndefined();
-  });
-
-  it("M3: keeps temperature on mimo-v2-flash (no thinking, no force)", () => {
-    const chat = mimo.preprocessResponses(
-      { model: "mimo-v2-flash", input: "hi", temperature: 0.5 },
-      mimoCtx
-    );
-    expect(chat.temperature).toBe(0.5);
-  });
-
-  it("M3: keeps temperature on mimo-v2-pro despite thinking (only v2.5 family is fixed)", () => {
-    // Official docs only call out mimo-v2.5-pro / mimo-v2.5 as forced to 1.0.
-    // v2-pro / omni leave temperature alone.
-    const chat = mimo.preprocessResponses(
-      { model: "mimo-v2-pro", input: "hi", temperature: 0.3 },
-      mimoCtx
-    );
-    expect(chat.thinking?.type).toBe("enabled");
-    expect(chat.temperature).toBe(0.3);
+    expect(chat.top_p).toBeUndefined();
   });
 
   it("M4: strips tool_choice when set to a non-auto value", () => {

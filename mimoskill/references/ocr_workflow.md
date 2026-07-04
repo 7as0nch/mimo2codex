@@ -39,7 +39,7 @@ python3 mimoskill/scripts/ocr.py path/to/image.png   # auto -> mimo
 
 The proxy strips image attachments when the active chat model can't accept
 them (`src/translate/reqToChat.ts:48-72`). Non-vision MiMo variants —
-`mimo-v2.5-pro`, `mimo-v2-flash` — return 404
+`mimo-v2.5-pro` returns 404
 "No endpoints found that support image input" if images are forwarded.
 The proxy drops the images and leaves an `[N image attachment(s) omitted: …]`
 placeholder so the conversation doesn't crash.
@@ -162,9 +162,9 @@ When you need a different prompt per image, run `ocr.py` N times instead.
 |---|---|
 | nothing | `$MIMO_OCR_MODEL` → `$MIMO_MODEL` (if vision-capable) → `mimo-v2.5` |
 | `--model mimo-v2.5` | `mimo-v2.5` |
-| `--model mimo-v2-omni` | `mimo-v2-omni` |
 | `--model mimo-v2.5-pro` | **switches to `mimo-v2.5`** (stderr note) |
-| `--model mimo-v2-flash` | **switches to `mimo-v2.5`** |
+| `--model mimo-v2-omni` (retired) | **switches to `mimo-v2.5`** |
+| `--model mimo-v2-flash` (retired) | **switches to `mimo-v2.5`** |
 
 Non-vision models would return 404 from MiMo, so the script coerces them
 silently (one stderr line) rather than failing.

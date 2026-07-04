@@ -103,10 +103,13 @@ describe("admin REST", () => {
     // `mimo-v2.5-pro` (which would 404 on image input).
     const v25 = models.find((m) => m.upstream_id === "mimo-v2.5");
     expect(v25?.supports_images).toBe(1);
-    expect(models.find((m) => m.upstream_id === "mimo-v2-omni")?.supports_images).toBe(1);
-    // pro/flash must remain non-vision
+    // pro must remain non-vision.
     expect(models.find((m) => m.upstream_id === "mimo-v2.5-pro")?.supports_images).toBe(0);
-    expect(models.find((m) => m.upstream_id === "mimo-v2-flash")?.supports_images).toBe(0);
+    // Retired v2 models are pruned from the builtin catalog (aliased to v2.5),
+    // so their rows no longer register.
+    expect(models.find((m) => m.upstream_id === "mimo-v2-omni")).toBeUndefined();
+    expect(models.find((m) => m.upstream_id === "mimo-v2-flash")).toBeUndefined();
+    expect(models.find((m) => m.upstream_id === "mimo-v2-pro")).toBeUndefined();
     expect(models.every((m) => m.is_builtin === 1)).toBe(true);
   });
 

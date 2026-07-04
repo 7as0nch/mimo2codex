@@ -17,6 +17,14 @@ mimo2codex 的版本发布历史，按 tag 倒序排列。
 
 ---
 
+## v0.5.29 (upcoming)
+
+- **[opt]** **MiMo v2 模型下线 → 透明别名映射到 v2.5（无需改配置）** —— MiMo 已于 2026-06-30 下线 v2 代模型（`mimo-v2-pro`、`mimo-v2-omni`、`mimo-v2-flash`），继续用旧名请求上游会 400。mimo2codex 现在把**退役旧名别名映射到官方替代模型**，老的 `config.toml` 不改也能用、且仍命中正确模型：`mimo-v2-pro` → `mimo-v2.5-pro`，`mimo-v2-omni` / `mimo-v2-flash` → `mimo-v2.5`。实现方式是 `ProviderModel.aliases` + 支持别名的 `resolveModel`（照搬 DeepSeek）；别名属于「干净解析」——上游拿到的是在线模型 id，不产生兜底改写/告警。三个退役条目从内置目录移除，因此模型列表、生成的 config.toml 片段、管理台「模型」页只保留在线的 v2.5 模型（`mimo-v2.5-pro`、`mimo-v2.5-pro-ultraspeed`、`mimo-v2.5`）；旧的 DB 行会在下次启动时由 `seedBuiltins` 自动清理。**旧 `mimo-v2-flash` 用户注意行为变化：** 其替代模型 `mimo-v2.5` 思考模式**默认开启**（flash 原本默认关闭），且**支持视觉**。mimoskill 辅助脚本（`ocr.py` / `mimo_chat.py`，它们直连 MiMo、没有别名层）也会把退役旧名强制切到 v2.5 替代模型。
+
+- **[fix]** **思考模式采样参数：现在也剥离 `top_p`（此前只剥 `temperature`）** —— 按 MiMo 文档，v2.5 系列在思考模式下会忽略自定义 `temperature` **和** `top_p`（上游强制 `temperature:1.0` / `top_p:0.95`）。`normalizeMimoBody` 此前只删 `temperature`，现在对 v2.5 推理模型（`mimo-v2.5-pro`、`mimo-v2.5`、`mimo-v2.5-pro-ultraspeed`）两者都删，让请求与上游最终行为一致。归一化现在在 Responses 和 Chat 两个调用点都以**上游**模型 id（别名解析后）为准——此前 Chat 路径用的是客户端原始名（`out.model`），会把规则错误地套到被别名映射的旧名上。
+
+---
+
 ## v0.5.28 (upcoming)
 
 - **[opt]** **大 `data.db` 下管理后台不再卡死（也不再拖垮代理）**（issue #76）：有重度用户的 `data.db` 涨到 22GB，**概览 / 日志** 页要十几分钟才打开。根因：每次加载概览都在多 GB 的 `chat_logs` 大表上跑 5~6 个**实时聚合**（`aggregateStats` / `aggregateTokensTimeseries`(strftime+三维 GROUP BY) / `aggregateLatency`(把窗口内全部 duration_ms 读进 JS) / `aggregateProviderHealth` / 无时间过滤的 `aggregateMappings`）——而 better-sqlite3 是**同步**的，一个慢扫描会阻塞整个 HTTP 主循环，连 `/v1/responses` 都被卡。修复：新增**按小时统计表 `chat_stats_hourly`**，主键 `(小时, provider, client_model, upstream_model)`，在每次 `insertLog` 的事务里同步累加（即「写日志→统计 +1」）；概览所有聚合改读这张小表（行数 = 小时数 × 模型组合，与 `chat_logs` 多大无关）。延迟分位用 8 桶直方图近似（精确均值来自 sum/count）；按 error_code 的错误分布仍读 `chat_logs`，但新增部分索引 `WHERE status_code >= 400`。已有历史行由**后台、从最近往前的分批回填**灌入（分批 + 不阻塞——最近区间几分钟内就准）。另加防雪崩：概览自动刷新从 5s 放缓到 20s/60s 并加在飞守卫，日志页不再每翻页都查 db 大小。新文件 `src/db/stats.ts`；schema 迁移 v6。**磁盘提示：**这能让后台变快，但不会缩小已经很大的文件——请在日志页「存储设置」里设**保留天数**和/或把 body 捕获改成**仅错误**，再 VACUUM（需约等于 db 大小的可用空间）。

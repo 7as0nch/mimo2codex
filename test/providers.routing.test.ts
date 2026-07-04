@@ -18,15 +18,23 @@ describe("provider registry", () => {
   });
 
   describe("byClientModel routing", () => {
-    it("MiMo models route to mimo provider", () => {
+    it("MiMo models route to mimo provider (retired names alias to their v2.5 replacement)", () => {
       expect(byClientModel("mimo-v2.5-pro")?.id).toBe("mimo");
+      // Retired v2 names still route to mimo (via alias) and resolve to the
+      // live replacement id — MiMo's official mapping.
       expect(byClientModel("mimo-v2-pro")?.id).toBe("mimo");
       expect(byClientModel("mimo-v2-flash")?.id).toBe("mimo");
-      expect(mimo.resolveModel("mimo-v2-pro")?.id).toBe("mimo-v2-pro");
+      expect(mimo.resolveModel("mimo-v2-pro")?.id).toBe("mimo-v2.5-pro");
       expect(mimo.resolveModel("mimo-v2-pro")?.supportsReasoning).toBe(true);
     });
 
-    it("MiMo vision models route to mimo provider with identity resolution", () => {
+    it("retired MiMo names alias to the correct v2.5 replacement", () => {
+      expect(mimo.resolveModel("mimo-v2-pro")?.id).toBe("mimo-v2.5-pro");
+      expect(mimo.resolveModel("mimo-v2-omni")?.id).toBe("mimo-v2.5");
+      expect(mimo.resolveModel("mimo-v2-flash")?.id).toBe("mimo-v2.5");
+    });
+
+    it("MiMo vision models route to mimo provider with correct resolution", () => {
       // Regression: previously `mimo-v2.5` was missing from BUILTIN_MODELS,
       // so requests fell back to `mimo-v2.5-pro` (no vision) — silently
       // breaking image inputs with a 404.
@@ -34,14 +42,18 @@ describe("provider registry", () => {
       expect(mimo.resolveModel("mimo-v2.5")?.id).toBe("mimo-v2.5");
       expect(mimo.resolveModel("mimo-v2.5")?.supportsImages).toBe(true);
 
+      // Retired `mimo-v2-omni` aliases to the vision model `mimo-v2.5`.
       expect(byClientModel("mimo-v2-omni")?.id).toBe("mimo");
-      expect(mimo.resolveModel("mimo-v2-omni")?.id).toBe("mimo-v2-omni");
+      expect(mimo.resolveModel("mimo-v2-omni")?.id).toBe("mimo-v2.5");
       expect(mimo.resolveModel("mimo-v2-omni")?.supportsImages).toBe(true);
     });
 
-    it("pro/flash variants are explicitly non-vision", () => {
+    it("mimo-v2.5-pro is non-vision; retired flash now aliases to the vision model", () => {
       expect(mimo.resolveModel("mimo-v2.5-pro")?.supportsImages).toBe(false);
-      expect(mimo.resolveModel("mimo-v2-flash")?.supportsImages).toBe(false);
+      // Behavior change: mimo-v2-flash (non-vision) is retired and aliases to
+      // mimo-v2.5, which DOES support vision.
+      expect(mimo.resolveModel("mimo-v2-flash")?.id).toBe("mimo-v2.5");
+      expect(mimo.resolveModel("mimo-v2-flash")?.supportsImages).toBe(true);
     });
 
     it("DeepSeek models route to deepseek provider", () => {

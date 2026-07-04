@@ -1,6 +1,6 @@
 ---
 name: mimoskill
-description: Use Xiaomi MiMo V2.5 (the LLM behind mimo2codex) for chat, vision, web search, TTS and ASR — and route around capabilities MiMo doesn't natively support, especially OCR / image recognition / 识图 / 提取图片文字 / extract text from image when the current model can't see images, and image generation / 图像生成 / 生成图片 / draw a picture / 画一张 including Codex Pets `/hatch`. Trigger when the user mentions MiMo, calls into mimo2codex, asks to read text from an image, asks to describe or 识别 an image while using a non-vision model (mimo-v2.5-pro, mimo-v2-flash, …), asks to generate / hatch a Codex pet, asks for image generation while using MiMo as the chat backend, or hits a "no image generation available" / "image_gen tool unavailable" / "this model does not support image input" message inside Codex.
+description: Use Xiaomi MiMo V2.5 (the LLM behind mimo2codex) for chat, vision, web search, TTS and ASR — and route around capabilities MiMo doesn't natively support, especially OCR / image recognition / 识图 / 提取图片文字 / extract text from image when the current model can't see images, and image generation / 图像生成 / 生成图片 / draw a picture / 画一张 including Codex Pets `/hatch`. Trigger when the user mentions MiMo, calls into mimo2codex, asks to read text from an image, asks to describe or 识别 an image while using a non-vision model (mimo-v2.5-pro, …), asks to generate / hatch a Codex pet, asks for image generation while using MiMo as the chat backend, or hits a "no image generation available" / "image_gen tool unavailable" / "this model does not support image input" message inside Codex.
 ---
 
 # mimoskill — Xiaomi MiMo V2.5 + gap fillers
@@ -32,7 +32,7 @@ Trigger this skill when:
 - User asks "how do I generate a Codex pet" / "/hatch isn't working" / "image_gen tool not available"
 - User wants image generation as part of a MiMo-backed workflow
 - User pastes the Codex error: `the image generation tool (image_gen) is not available in this environment` or `the CLI fallback requires the openai Python package`
-- User wants to **OCR / read text from / describe / 识别 / 提取文字 from an image** while the active chat model is non-vision (e.g. mimo-v2.5-pro, mimo-v2-flash, deepseek-*, or any third-party text-only model) — use `scripts/ocr.py`. Works with or without a MiMo key (free pollinations fallback when `MIMO_API_KEY` is unset).
+- User wants to **OCR / read text from / describe / 识别 / 提取文字 from an image** while the active chat model is non-vision (e.g. mimo-v2.5-pro, deepseek-*, or any third-party text-only model) — use `scripts/ocr.py`. Works with or without a MiMo key (free pollinations fallback when `MIMO_API_KEY` is unset).
 - User sees the proxy's `[N image attachment(s) omitted: this model does not support image input …]` placeholder in their transcript
 - Anything in the `mimo2codex` repo that touches a feature MiMo doesn't support
 
@@ -44,12 +44,10 @@ Quick answer:
 |---|---|---|---|
 | Text chat | ✅ | `mimo-v2.5-pro` | reasoning + tools |
 | Tool / function calling | ✅ | any | parallel calls supported |
-| Vision (image input) | ✅ | `mimo-v2.5` or `mimo-v2-omni` | NOT mimo-v2.5-pro |
+| Vision (image input) | ✅ | `mimo-v2.5` | NOT mimo-v2.5-pro |
 | Web search | ✅ | any | requires Web Search Plugin activated in MiMo console |
 | TTS (speech synth) | ✅ | `mimo-v2.5-tts` | separate endpoint |
 | ASR (speech recog) | ✅ | `mimo-v2.5-asr` | separate endpoint |
-| Audio chat | ✅ | `mimo-v2-omni` | input only |
-| Video understanding | ✅ | `mimo-v2-omni` | input only |
 | **Image generation** | ❌ | — | `scripts/generate_image.py` (general) or `scripts/generate_pet.py` (Codex pets) — see below |
 | OCR / 识图 (when chat model is non-vision) | ⚠️ via `mimo-v2.5` or free pollinations | `scripts/ocr.py` | `--engine auto`: mimo if `MIMO_API_KEY` set, else pollinations (no key) |
 | Code interpreter / sandbox | ❌ | — | not provided |
@@ -95,7 +93,7 @@ For non-trivial integrations, [references/models.md](references/models.md) and [
 
 ## OCR / image recognition (when the chat model can't see images)
 
-If the user wants to **read text from an image** or **describe / 识别 an image** but the current chat model is non-vision (`mimo-v2.5-pro`, `mimo-v2-flash`, `deepseek-*`, or any third-party text-only model), invoke `scripts/ocr.py`. Three engines, `--engine auto` (default) picks in this order — mimo if `MIMO_API_KEY` set, else tesseract if installed and mode=text, else pollinations:
+If the user wants to **read text from an image** or **describe / 识别 an image** but the current chat model is non-vision (`mimo-v2.5-pro`, `deepseek-*`, or any third-party text-only model), invoke `scripts/ocr.py`. Three engines, `--engine auto` (default) picks in this order — mimo if `MIMO_API_KEY` set, else tesseract if installed and mode=text, else pollinations:
 
 - **`mimo`** — needs `MIMO_API_KEY`, uses `mimo-v2.5` regardless of the chat model. Best quality. All modes.
 - **`tesseract`** — **no key, no network**. Fully local OCR. Auto-used if installed and `--mode text`. Recommended for users behind GFW or offline. One-time install: `brew install tesseract tesseract-lang` / `sudo apt install tesseract-ocr tesseract-ocr-chi-sim` / Windows installer at github.com/UB-Mannheim/tesseract/wiki.

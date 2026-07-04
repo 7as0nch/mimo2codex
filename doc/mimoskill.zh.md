@@ -69,7 +69,7 @@ mimo 引擎自动踩好 MiMo 的坑：`max_completion_tokens`（不是 `max_toke
 | 参数 | 说明 |
 |---|---|
 | `--engine` | `auto` / `mimo` / `pollinations`（默认 auto） |
-| `--model` | 默认 `mimo-v2.5-pro`（mimo 引擎）。视觉用 `mimo-v2.5` / `mimo-v2-omni` |
+| `--model` | 默认 `mimo-v2.5-pro`（mimo 引擎）。视觉用 `mimo-v2.5` |
 | `--pollinations-model` | 默认 `openai`（视觉能力）。可选 `openai-large` / `openai-fast` |
 | `--image URL` | 附图。自动 bump 到视觉能力模型 |
 | `--stream` | SSE 流式 |

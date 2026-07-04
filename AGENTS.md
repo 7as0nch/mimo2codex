@@ -30,7 +30,7 @@ adjust your assumptions accordingly.
    depends on it.
 
 4. **Non-vision model + image input → don't give up, OCR it.** When the
-   active chat model is `mimo-v2.5-pro`, `mimo-v2-flash`, `deepseek-*`,
+   active chat model is `mimo-v2.5-pro`, `deepseek-*`,
    or any third-party model without vision, the proxy strips image
    attachments in `src/translate/reqToChat.ts:48-72` and leaves a
    `[N image attachment(s) omitted: this model does not support image input …]`
@@ -108,7 +108,7 @@ do NOT respond with "please install openai". The correct response is:
 When the user asks for something MiMo doesn't natively support, the answer
 is in `mimoskill/references/models.md`. Quick rules:
 
-- **Image input (vision)** — only `mimo-v2.5` and `mimo-v2-omni` accept it.
+- **Image input (vision)** — only `mimo-v2.5` accepts it.
   `mimo-v2.5-pro` does NOT. mimo2codex auto-strips images on non-vision
   models. **If you need the image content anyway, run
   `mimoskill/scripts/ocr.py` to extract text / description via `mimo-v2.5`

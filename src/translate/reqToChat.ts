@@ -56,9 +56,11 @@ function materializeStrippedImage(imageUrl: string, dropDir?: string): string | 
 }
 
 // Per MiMo docs (https://platform.xiaomimimo.com/docs/zh-CN/usage-guide/multimodal-understanding/image-understanding),
-// only `mimo-v2.5` and `mimo-v2-omni` (and *-omni* variants) accept image
-// input. The other v2.5 variants (mimo-v2.5-pro, mimo-v2-flash, …) return
-// 404 "No endpoints found that support image input" when given image_url parts.
+// only `mimo-v2.5` accepts image input; `mimo-v2.5-pro` returns 404 "No
+// endpoints found that support image input" when given image_url parts. The
+// retired `mimo-v2-omni` is aliased to `mimo-v2.5`, so the `*-omni` substring
+// branch is kept to accept the legacy name (and any generic provider pointing
+// an omni upstream through here).
 export function modelSupportsImages(model: string): boolean {
   const base = model.toLowerCase();
   if (base.includes("omni")) return true;
@@ -103,7 +105,7 @@ function partsToChatContent(
 
   if (droppedCount > 0) {
     log.warn(
-      `dropped ${droppedCount} image part(s) — model "${ctx.model}" does not support image input (use mimo-v2.5 or mimo-v2-omni for vision); materialized ${droppedRefs.length} to disk`
+      `dropped ${droppedCount} image part(s) — model "${ctx.model}" does not support image input (use mimo-v2.5 for vision); materialized ${droppedRefs.length} to disk`
     );
     // Tell the agent BOTH that images were stripped AND where to find them
     // so it can OCR without asking the user for a path. Codex / DS / Qwen
@@ -123,7 +125,7 @@ function partsToChatContent(
         `Engine auto-select (zero-key): mimo (if MIMO_API_KEY set) > tesseract (if installed, --mode text) > pollinations.\n` +
         `If pollinations is unreachable (e.g. mainland China), install tesseract once for offline OCR:\n` +
         `  brew install tesseract tesseract-lang  /  apt install tesseract-ocr tesseract-ocr-chi-sim\n` +
-        `Or switch the chat model to mimo-v2.5 / mimo-v2-omni to see images directly.]`,
+        `Or switch the chat model to mimo-v2.5 to see images directly.]`,
     });
   }
 

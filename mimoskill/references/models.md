@@ -9,8 +9,6 @@ the bits the skill cares about — read the official docs for full schemas.
 |---|---|---|---|---|---|---|---|---|
 | `mimo-v2.5-pro` | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ strong | 128K | Coding, agentic tasks, complex reasoning |
 | `mimo-v2.5` | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ medium | 128K | Multimodal chat with image input |
-| `mimo-v2-omni` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | 128K | Full-modal input (text/image/audio/video) |
-| `mimo-v2-flash` | ✅ | ❌ | ❌ | ❌ | ❌ | – | 128K | Cheap / fast simple chat |
 | `mimo-v2.5-tts` | ❌ | ❌ | ❌ | ❌ | ✅ | – | – | TTS (separate endpoint) |
 | `mimo-v2.5-asr` | ❌ | ❌ | ✅ | ❌ | ❌ | – | – | ASR (separate endpoint) |
 
@@ -99,9 +97,9 @@ Streaming: search sources arrive in the **first** SSE chunk's `delta.annotations
 ## Quick model picker
 
 ```
-Need image input?            → mimo-v2.5 (or mimo-v2-omni for audio/video too)
+Need image input?            → mimo-v2.5
 Doing heavy reasoning/code?  → mimo-v2.5-pro
-Just doing cheap text chat?  → mimo-v2-flash
+Just doing cheap text chat?  → mimo-v2.5
 Need TTS?                    → mimo-v2.5-tts (separate endpoint)
 Need ASR?                    → mimo-v2.5-asr (separate endpoint)
 Need image generation?       → MiMo can't. Use gpt-image-1 / Pollinations / SD.

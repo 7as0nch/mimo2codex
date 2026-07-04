@@ -50,50 +50,44 @@ export interface ReleaseNote {
 // doc/tag-log.{md,zh.md} for users who want the full history.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: "0.5.28",
-    date: "2026-06-22",
+    version: "0.5.29",
+    date: "2026-07-04",
     title: {
-      en: "Faster admin dashboard + web search is now opt-in",
-      zh: "管理后台更快 + 联网搜索改为可选",
+      en: "MiMo v2 models retired — old names now auto-upgrade to v2.5",
+      zh: "MiMo v2 模型下线——旧模型名自动升级到 v2.5",
     },
     summary: {
-      en: "The Overview/Logs pages no longer crawl on a large database (stats now come from an incremental rollup), and MiMo web search is off by default so accounts without the plugin stop erroring.",
-      zh: "概览/日志页在大数据库下不再卡顿(统计改用增量汇总表);MiMo 联网搜索默认关闭,没开插件的账户不再报错。",
+      en: "MiMo took its v2 models offline (2026-06-30). mimo2codex transparently maps the old names to their v2.5 replacements, so your existing config keeps working — no edits needed.",
+      zh: "MiMo 已下线 v2 代模型(2026-06-30)。mimo2codex 会把旧模型名透明映射到对应的 v2.5 替代模型,你现有的配置无需修改即可继续使用。",
     },
     highlights: [
       {
         kind: "improved",
         title: {
-          en: "Admin dashboard stays fast even with a huge log database",
-          zh: "日志库很大时管理后台依然流畅",
+          en: "Retired MiMo v2 names transparently upgrade to v2.5",
+          zh: "退役的 MiMo v2 模型名透明升级到 v2.5",
         },
         description: {
-          en: "On a large data.db (one user hit 22 GB), the Overview and Logs pages could take 10+ minutes to load because every visit re-aggregated the entire chat_logs table — which also stalled the proxy itself. Stats now come from a small hourly rollup table updated as logs are written, so the dashboard stays fast no matter how big the log database grows. Existing history is backfilled in the background. Tip: the speed-up doesn't shrink the file — set a retention period or 'errors-only' body capture in the Logs page's storage settings to reclaim space.",
-          zh: "在很大的 data.db 上,概览和日志页会要十几分钟才打开——因为每次都在整张 chat_logs 大表上重新聚合,连代理本身也被拖住。现在统计改由一张随写日志同步更新的「按小时汇总表」提供,无论日志库多大,后台都保持流畅;历史数据在后台回填。提示:后台变快不会缩小文件——在日志页「存储设置」里设保留天数或改成仅存错误体来回收空间。",
+          en: "MiMo retired mimo-v2-pro / mimo-v2-omni / mimo-v2-flash on 2026-06-30 — requests with those names now error upstream. mimo2codex maps them to their official replacements automatically: mimo-v2-pro → mimo-v2.5-pro, and mimo-v2-omni / mimo-v2-flash → mimo-v2.5. If your Codex config still uses an old name it keeps working and hits the right model, and the model list now shows only the current v2.5 models. Note: mimo-v2-flash's replacement (mimo-v2.5) thinks by default and supports images.",
+          zh: "MiMo 已于 2026-06-30 下线 mimo-v2-pro / mimo-v2-omni / mimo-v2-flash——用这些名字请求会在上游报错。mimo2codex 会自动映射到官方替代模型:mimo-v2-pro → mimo-v2.5-pro,mimo-v2-omni / mimo-v2-flash → mimo-v2.5。如果你的 Codex 配置还在用旧名,也能继续用并命中正确模型,模型列表现在只显示在线的 v2.5 模型。注意:mimo-v2-flash 的替代模型(mimo-v2.5)默认开启思考且支持图片。",
         },
         location: {
-          en: "Overview & Logs pages (and storage settings on the Logs page)",
-          zh: "概览 & 日志页(以及日志页的「存储设置」)",
+          en: "Models page (catalog) & Codex Enable page → model selection",
+          zh: "「模型」页(目录)与「Codex 启用」页 → 模型选择",
         },
-        ctaLabel: { en: "Open Logs", zh: "打开日志" },
-        ctaPath: "/logs",
+        ctaLabel: { en: "Open Models", zh: "打开模型页" },
+        ctaPath: "/models",
       },
       {
         kind: "fixed",
         title: {
-          en: "MiMo web search no longer errors when the plugin isn't activated",
-          zh: "MiMo 联网搜索在未开通插件时不再报错",
+          en: "Thinking mode now drops top_p too (matches MiMo v2.5)",
+          zh: "思考模式现在也会去掉 top_p(与 MiMo v2.5 一致)",
         },
         description: {
-          en: "If your MiMo account didn't have the (separately-billed) Web Search Plugin, requests could fail in a loop with 'webSearchEnabled is false' — because mimo2codex forwarded Codex's web_search tool to pay-as-you-go (sk-) accounts. Web search is now OFF by default and only forwarded if you opt in. Turn it on (only if your account has the plugin) on the Codex Enable page, or with --web-search.",
-          zh: "如果你的 MiMo 账户没有开通(单独计费的)联网插件,请求会以 'webSearchEnabled is false' 循环报错——因为 mimo2codex 把 Codex 的 web_search 工具转发给了按量付费(sk-)账户。现在联网搜索默认关闭,只有你主动开启才转发。需要时(且账户已开通插件)在 Codex 启用页打开,或用 --web-search。",
+          en: "In thinking mode the MiMo v2.5 models ignore custom temperature and top_p (the server forces 1.0 / 0.95). mimo2codex previously only stripped temperature; it now strips top_p as well, so your request matches what the model actually runs.",
+          zh: "在思考模式下,MiMo v2.5 系列会忽略自定义的 temperature 和 top_p(服务端强制为 1.0 / 0.95)。mimo2codex 此前只去掉了 temperature,现在也会去掉 top_p,让请求与模型实际运行保持一致。",
         },
-        location: {
-          en: "Codex Enable page → Thinking & Override → Web search",
-          zh: "「Codex 启用」页 → 思考与运行时覆盖 → 联网搜索",
-        },
-        ctaLabel: { en: "Open Codex Enable", zh: "打开 Codex 启用" },
-        ctaPath: "/codex",
       },
     ],
   },

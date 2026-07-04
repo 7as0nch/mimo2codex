@@ -9,7 +9,7 @@ Engines (--engine):
 
 When the mimo engine is used, handles the MiMo-specific quirks:
   - max_completion_tokens (not max_tokens)
-  - vision via mimo-v2.5 / mimo-v2-omni (and the required text part next to
+  - vision via mimo-v2.5 (and the required text part next to
     image_url, otherwise MiMo 400s with "text is not set")
   - web_search builtin: auto-enabled on pay-as-you-go (sk-*) keys, skipped on
     token-plan (tp-*) keys. Model decides when to invoke (tool_choice: auto).
@@ -58,6 +58,11 @@ def build_messages(prompt: str, image: str | None) -> list[dict[str, Any]]:
 
 POLLINATIONS_URL = "https://text.pollinations.ai/openai"
 POLLINATIONS_DEFAULT_MODEL = "openai"  # vision-capable, free, no key
+
+# MiMo retired its v2 generation (offline 2026-06-30). This script calls MiMo
+# directly (no proxy alias layer), so old names 400 upstream — coerce them to
+# their live replacement (mimo-v2-pro → mimo-v2.5-pro; omni/flash → mimo-v2.5).
+RETIRED_MIMO_MODELS = {"mimo-v2-omni", "mimo-v2-flash", "mimo-v2-pro"}
 
 
 def build_body(
@@ -217,15 +222,21 @@ def main() -> None:
 
     enable_web_search = False
     if engine == "mimo":
-        # Auto-bump to a vision model if user passed --image with a non-vision model.
         model = args.model
-        if args.image and "omni" not in model.lower() and not model.startswith("mimo-v2.5["):
-            if model != "mimo-v2.5":
-                sys.stderr.write(
-                    f"note: --image given but model is '{model}' which doesn't see images.\n"
-                    f"      switching to mimo-v2.5 for this call.\n"
-                )
-                model = "mimo-v2.5"
+        # Retired v2 names 400 upstream — coerce to the live replacement first.
+        if model in RETIRED_MIMO_MODELS:
+            replacement = "mimo-v2.5-pro" if model == "mimo-v2-pro" else "mimo-v2.5"
+            sys.stderr.write(
+                f"note: model '{model}' is retired; using {replacement} for this call.\n"
+            )
+            model = replacement
+        # Auto-bump to a vision model if user passed --image with a non-vision model.
+        if args.image and model != "mimo-v2.5" and not model.startswith("mimo-v2.5["):
+            sys.stderr.write(
+                f"note: --image given but model is '{model}' which doesn't see images.\n"
+                f"      switching to mimo-v2.5 for this call.\n"
+            )
+            model = "mimo-v2.5"
         url = args.base_url.rstrip("/") + "/chat/completions"
         auth: str | None = api_key
         # MiMo native web_search: pay-as-you-go (sk-*) supports it, token-plan

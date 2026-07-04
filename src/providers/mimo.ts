@@ -14,13 +14,14 @@ const WEB_SEARCH_HINT =
   "default; you only see this if it was explicitly enabled without the plugin.";
 
 // Per https://platform.xiaomimimo.com/docs/zh-CN/usage-guide/multimodal-understanding/image-understanding,
-// only `mimo-v2.5` and `mimo-v2-omni` accept image input. The pro/flash
-// variants do not — they return 404 "No endpoints found that support image
-// input" if sent images.
+// only `mimo-v2.5` accepts image input; `mimo-v2.5-pro` (and the retired v2
+// variants) do not — they return 404 "No endpoints found that support image
+// input" if sent images. The retired `mimo-v2-omni` is aliased to `mimo-v2.5`,
+// so image input keeps working for clients still sending the old name.
 //
 // maxOutputTokens defaults match
 // https://platform.xiaomimimo.com/docs/zh-CN/api/chat/openai-api `max_completion_tokens`:
-//   pro / v2-pro: 131072  |  v2.5 / omni: 32768  |  flash: 65536
+//   v2.5-pro / v2.5-pro-ultraspeed: 131072  |  v2.5: 32768
 //
 // contextWindow is 1M for every model — MiMo's real published context window
 // (NOT a fabricated number; an earlier comment here wrongly claimed the real
@@ -36,6 +37,10 @@ const MIMO_CONTEXT_WINDOW = 1_000_000;
 const BUILTIN_MODELS: readonly ProviderModel[] = [
   {
     id: "mimo-v2.5-pro",
+    // Retired `mimo-v2-pro` is transparently aliased here — MiMo's official
+    // replacement, API params fully compatible. Existing config.toml files
+    // sending the old name keep working and hit the live model.
+    aliases: ["mimo-v2-pro"],
     displayName: "MiMo V2.5 Pro",
     supportsImages: false,
     supportsReasoning: true,
@@ -64,38 +69,19 @@ const BUILTIN_MODELS: readonly ProviderModel[] = [
     paygOnly: true,
   },
   {
-    id: "mimo-v2-pro",
-    displayName: "MiMo V2 Pro",
-    supportsImages: false,
-    supportsReasoning: true,
-    supportsWebSearch: true,
-    contextWindow: MIMO_CONTEXT_WINDOW,
-    maxOutputTokens: 131_072,
-  },
-  {
     id: "mimo-v2.5",
+    // Retired `mimo-v2-omni` and `mimo-v2-flash` are both officially replaced
+    // by `mimo-v2.5`, so both are aliased here. NOTE this is a behavior change
+    // for old flash users: v2.5 defaults thinking ON (flash was off) and does
+    // support vision. Thinking-mode sampling is normalized in normalizeMimoBody
+    // (see MIMO_THINKING_STRIPS_SAMPLING).
+    aliases: ["mimo-v2-omni", "mimo-v2-flash"],
     displayName: "MiMo V2.5 (Vision)",
     supportsImages: true,
     supportsReasoning: true,
     supportsWebSearch: true,
     contextWindow: MIMO_CONTEXT_WINDOW,
     maxOutputTokens: 32_768,
-  },
-  {
-    id: "mimo-v2-omni",
-    displayName: "MiMo V2 Omni (Vision + Audio)",
-    supportsImages: true,
-    supportsReasoning: true,
-    supportsWebSearch: true,
-    contextWindow: MIMO_CONTEXT_WINDOW,
-    maxOutputTokens: 32_768,
-  },
-  {
-    id: "mimo-v2-flash",
-    displayName: "MiMo V2 Flash",
-    supportsImages: false,
-    contextWindow: MIMO_CONTEXT_WINDOW,
-    maxOutputTokens: 65_536,
   },
 ];
 
@@ -119,28 +105,39 @@ function webSearchAllowed(ctx: PreprocessCtx): boolean {
 }
 
 // Models whose upstream default for `thinking` is "disabled" — we leave the
-// field off the request so the upstream-side default kicks in.
-const MIMO_THINKING_DEFAULT_DISABLED = new Set(["mimo-v2-flash"]);
+// field off the request so the upstream-side default kicks in. Empty since the
+// retirement of `mimo-v2-flash` (2026-06-30): every live model defaults thinking
+// ON. Kept as a named set so a future disabled-by-default model can be re-added.
+const MIMO_THINKING_DEFAULT_DISABLED = new Set<string>([]);
 
-// Models that, per official docs, ignore custom `temperature` while in
-// thinking mode (the upstream forces it to its recommended 1.0). We strip
-// the field client-side so the request matches the eventual behavior.
-const MIMO_THINKING_FIXES_TEMPERATURE = new Set(["mimo-v2.5-pro", "mimo-v2.5"]);
+// Models that, per official docs, ignore custom `temperature` / `top_p` while in
+// thinking mode (the upstream forces temperature:1.0 and top_p:0.95). We strip
+// both client-side so the request matches the eventual behavior. Scoped to the
+// v2.5 reasoning family; kept as an explicit set (not an unconditional strip) so
+// a future MiMo model that DOES honor custom sampling isn't silently overridden.
+const MIMO_THINKING_STRIPS_SAMPLING = new Set([
+  "mimo-v2.5-pro",
+  "mimo-v2.5",
+  "mimo-v2.5-pro-ultraspeed",
+]);
 
 // Normalize a chat-completions body for MiMo upstream per
 // https://platform.xiaomimimo.com/docs/zh-CN/api/chat/openai-api :
-//   - inject thinking default by model id (flash → leave off; others → enabled)
-//   - drop `temperature` on mimo-v2.5-pro / mimo-v2.5 in thinking mode
+//   - inject thinking default by model id (all live models → enabled)
+//   - drop `temperature` / `top_p` on the v2.5 family in thinking mode
 //   - drop `tool_choice` when set to a non-"auto" value (upstream removes it)
+// `modelId` is the UPSTREAM model id (post-alias), not the client literal — so a
+// retired name aliased to v2.5 gets the v2.5 normalization.
 function normalizeMimoBody(chat: ChatRequest, modelId: string): ChatRequest {
   if (chat.thinking === undefined && !MIMO_THINKING_DEFAULT_DISABLED.has(modelId)) {
     chat.thinking = { type: "enabled" };
   }
   if (
     chat.thinking?.type === "enabled" &&
-    MIMO_THINKING_FIXES_TEMPERATURE.has(modelId)
+    MIMO_THINKING_STRIPS_SAMPLING.has(modelId)
   ) {
     delete chat.temperature;
+    delete chat.top_p;
   }
   if (chat.tool_choice && chat.tool_choice !== "auto") {
     delete chat.tool_choice;
@@ -174,12 +171,22 @@ export const mimo: Provider = {
   },
 
   resolveModel(clientModel) {
-    return BUILTIN_MODELS.find((m) => m.id === clientModel) ?? null;
+    // Match by id first, then by `aliases` — this is how retired names
+    // (`mimo-v2-pro` → `mimo-v2.5-pro`, `mimo-v2-omni`/`mimo-v2-flash` →
+    // `mimo-v2.5`) resolve to their live replacement. The returned model's `id`
+    // becomes the upstream model, so the alias is a clean resolve (no rewrite
+    // notice). Mirrors deepseek.ts.
+    for (const m of BUILTIN_MODELS) {
+      if (m.id === clientModel) return m;
+      if (m.aliases?.includes(clientModel)) return m;
+    }
+    return null;
   },
 
-  // Vision capability lives here (MiMo-specific): only `mimo-v2.5` and
-  // `*-omni` accept images. Exposing it as a provider method is what scopes
-  // the multimodal fallback to MiMo — other providers don't implement it.
+  // Vision capability lives here (MiMo-specific): only `mimo-v2.5` accepts
+  // images (the `*-omni` substring branch in modelSupportsImages is kept for
+  // the aliased/legacy omni name). Exposing it as a provider method is what
+  // scopes the multimodal fallback to MiMo — other providers don't implement it.
   supportsVision(model) {
     return modelSupportsImages(model);
   },
@@ -200,7 +207,11 @@ export const mimo: Provider = {
       forceHighEffort: ctx.forceHighEffort,
       upstreamModel: ctx.upstreamModel,
     });
-    return normalizeMimoBody(chat, req.model);
+    // Key normalization off the UPSTREAM model (post-alias), not the client
+    // literal — a retired name aliased to v2.5 must get v2.5's thinking/sampling
+    // rules. ctx.upstreamModel is always set in production (resolved id ??
+    // defaultModel); the fallback only covers direct unit-test callers.
+    return normalizeMimoBody(chat, ctx.upstreamModel ?? req.model);
   },
 
   preprocessChat(req: ChatRequest, ctx: PreprocessCtx): ChatRequest {
@@ -219,7 +230,11 @@ export const mimo: Provider = {
       const filtered = out.tools.filter((t) => (t as { type?: string }).type !== "web_search");
       if (filtered.length !== out.tools.length) out.tools = filtered;
     }
-    return normalizeMimoBody(out, out.model);
+    // Key off the upstream model (post-alias), same as preprocessResponses.
+    // out.model is still the client literal here (the server overwrites it with
+    // the upstream id only after this returns), so keying off it would mis-apply
+    // the v2.5 rules to an aliased legacy name.
+    return normalizeMimoBody(out, ctx.upstreamModel ?? out.model);
   },
 
   enhanceError({ status, snippet }): ProviderEnhancedError | null {

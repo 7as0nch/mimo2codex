@@ -69,7 +69,7 @@ For the mimo engine, the script handles MiMo's quirks transparently: `max_comple
 | Flag | Notes |
 |---|---|
 | `--engine` | `auto` / `mimo` / `pollinations` (default auto) |
-| `--model` | default `mimo-v2.5-pro` (mimo engine). For vision use `mimo-v2.5` / `mimo-v2-omni` |
+| `--model` | default `mimo-v2.5-pro` (mimo engine). For vision use `mimo-v2.5` |
 | `--pollinations-model` | default `openai` (vision-capable). Alternatives: `openai-large`, `openai-fast` |
 | `--image URL` | attach image. Auto-bumps to vision-capable model |
 | `--stream` | SSE streaming |

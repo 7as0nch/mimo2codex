@@ -145,6 +145,27 @@ describe("selectProvider routing priority (PR #6 regression)", () => {
     expect(sel.upstreamModel).toBe("mimo-v2.5-pro-ultraspeed");
     expect(sel.rewriteNotice).toBeNull();
   });
+
+  it("case I: retired v2 names alias to their v2.5 replacement (clean resolve, no rewriteNotice)", () => {
+    // MiMo retired the v2 generation (offline 2026-06-30). Old names still work
+    // via `aliases` and resolve to the live upstream — NOT a fallback rewrite,
+    // so rewriteNotice stays null and the correct replacement is picked.
+    initRegistry([]);
+    const cfg = makeConfig({
+      defaultProviderId: "mimo",
+      providers: { mimo: fakeRuntime, deepseek: null },
+    });
+    for (const [oldName, upstream] of [
+      ["mimo-v2-pro", "mimo-v2.5-pro"],
+      ["mimo-v2-omni", "mimo-v2.5"],
+      ["mimo-v2-flash", "mimo-v2.5"],
+    ] as const) {
+      const sel = selectProvider(oldName, cfg);
+      expect(sel.provider.id, oldName).toBe("mimo");
+      expect(sel.upstreamModel, oldName).toBe(upstream);
+      expect(sel.rewriteNotice, oldName).toBeNull();
+    }
+  });
 });
 
 describe("paygOnlyBlock (issue #70 — UltraSpeed needs a PAYG key)", () => {

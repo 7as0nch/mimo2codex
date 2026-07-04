@@ -491,7 +491,7 @@ describe("reqToChat", () => {
     expect(typeof content).toBe("string");
     expect(content).toContain("what's this?");
     expect(content).toContain("2 image attachments omitted");
-    expect(content).toContain("mimo-v2-omni");
+    expect(content).toContain("mimo-v2.5");
     // Definitely no image_url part
     expect(JSON.stringify(chat.messages[0])).not.toContain("image_url");
   });
