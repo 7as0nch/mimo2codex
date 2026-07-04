@@ -1,6 +1,6 @@
 {
   "name": "mimo2codex-desktop",
-  "version": "0.5.28",
+  "version": "0.5.29",
   "private": true,
   "type": "module",
   "description": "Electron desktop shell for mimo2codex — tray on Windows, menu bar on macOS",
