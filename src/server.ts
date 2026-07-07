@@ -93,7 +93,7 @@ function resolveSilentRewrite(cfg: Config): boolean {
   }
 }
 
-const KEEPALIVE_INTERVAL_MS = 15_000;
+const KEEPALIVE_INTERVAL_MS = Number(process.env.MIMO2CODEX_KEEPALIVE_MS) || 5_000;
 
 // Serialized SSE `error` event used to deliver a terminal failure once the
 // 200 + SSE headers have already been flushed (so we can no longer answer with

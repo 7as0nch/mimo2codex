@@ -538,6 +538,9 @@ export async function pipeChatStreamToResponses(
   try {
     for await (const chunk of source.chunks) {
       if (sink.closed()) {
+        // Graceful: yield to event loop so upstream's reader cancellation propagates;
+        // the catch/finally block in handleResponses will emit terminal SSE error event.
+        await new Promise(r => setImmediate(r));
         return {
           usage: state.usage,
           response: buildResponseSnapshot(state, "incomplete"),
