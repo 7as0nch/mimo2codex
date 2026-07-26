@@ -277,12 +277,13 @@ MiniMax rejects several fields that OpenAI / MiMo / DeepSeek accept. Use the `mi
 ```json
 {
   "id": "minimax",
-  "displayName": "MiniMax M2.7",
-  "baseUrl": "https://api.minimaxi.com/v1",
+  "displayName": "MiniMax M3",
+  "baseUrl": "https://api.minimax.io/v1",
   "envKey": "MINIMAX_API_KEY",
-  "defaultModel": "MiniMax-M2.7",
+  "defaultModel": "MiniMax-M3",
   "models": [
-    { "id": "MiniMax-M2.7", "contextWindow": 245760 }
+    { "id": "MiniMax-M3", "contextWindow": 1000000 },
+    { "id": "MiniMax-M2.7", "contextWindow": 204800 }
   ],
   "features": {
     "minimaxCompat": true,
@@ -290,6 +291,8 @@ MiniMax rejects several fields that OpenAI / MiMo / DeepSeek accept. Use the `mi
   }
 }
 ```
+
+The same preset also matches `https://api.minimaxi.com/v1`. `MiniMax-M3` is the 1,000,000-token default; keep `MiniMax-M2.7` if you still need the 204,800-token catalog entry.
 
 See [minimax.md](./minimax.md) for the full breakdown and the env-var single-instance flow (`GENERIC_FORCE_DEFAULT_MODEL=1`).
 

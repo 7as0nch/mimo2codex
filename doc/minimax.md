@@ -2,7 +2,7 @@
 
 > 中文版: [minimax.zh.md](./minimax.zh.md)
 
-MiniMax (`https://api.minimaxi.com/v1`) speaks the OpenAI Chat Completions wire format, but its request validation is stricter than OpenAI / MiMo / DeepSeek. Connecting it through mimo2codex's generic provider hits a handful of non-obvious 400s. This doc explains how the MiniMax compat switches (v0.2.8+) resolve them in one shot.
+MiniMax (`https://api.minimax.io/v1` / `https://api.minimaxi.com/v1`) speaks the OpenAI Chat Completions wire format, but its request validation is stricter than OpenAI / MiMo / DeepSeek. Connecting it through mimo2codex's generic provider hits a handful of non-obvious 400s. This doc explains how the MiniMax compat switches (v0.2.8+) resolve them in one shot.
 
 Source: [issue #7](https://github.com/7as0nch/mimo2codex/issues/7).
 
@@ -41,21 +41,21 @@ In `~/.mimo2codex/providers.json`:
   "providers": [
     {
       "id": "minimax",
-      "displayName": "MiniMax M2.7",
-      "baseUrl": "https://api.minimaxi.com/v1",
+      "displayName": "MiniMax M3",
+      "baseUrl": "https://api.minimax.io/v1",
       "envKey": "MINIMAX_API_KEY",
-      "defaultModel": "MiniMax-M2.7",
+      "defaultModel": "MiniMax-M3",
       "models": [
-        { "id": "MiniMax-M2.7", "contextWindow": 245760 }
+        { "id": "MiniMax-M3", "contextWindow": 1000000 },
+        { "id": "MiniMax-M2.7", "contextWindow": 204800 }
       ],
-      "features": {
-        "minimaxCompat": true,
-        "forceParallelToolCalls": true
-      }
+      "features": { "minimaxCompat": true, "forceParallelToolCalls": true }
     }
   ]
 }
 ```
+
+The same preset also matches `https://api.minimaxi.com/v1`. `MiniMax-M3` is the 1,000,000-token default; keep `MiniMax-M2.7` if you still need the 204,800-token catalog entry.
 
 Then:
 ```bash
@@ -70,14 +70,16 @@ Open the webui (`http://127.0.0.1:8788/admin/`) and click **Probe** on the MiniM
 If MiniMax is the only upstream you need:
 
 ```bash
-export GENERIC_BASE_URL=https://api.minimaxi.com/v1
+export GENERIC_BASE_URL=https://api.minimax.io/v1
 export GENERIC_API_KEY=<your_key>
-export GENERIC_DEFAULT_MODEL=MiniMax-M2.7
-export GENERIC_FORCE_DEFAULT_MODEL=1   # key bit: unknown client models (e.g. "gpt-5.5") rewrite to MiniMax-M2.7
+export GENERIC_DEFAULT_MODEL=MiniMax-M3
+export GENERIC_FORCE_DEFAULT_MODEL=1   # key bit: unknown client models (e.g. "gpt-5.5") rewrite to MiniMax-M3
 mimo2codex
 ```
 
 ⚠️ **The env-var path cannot carry `features.minimaxCompat`** — switch to providers.json if you need the strict-mode sanitizers.
+
+Need the 204,800-token `MiniMax-M2.7` catalog entry instead? Use providers.json and set the model id there.
 
 ## Field reference
 

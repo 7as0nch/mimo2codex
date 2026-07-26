@@ -30,7 +30,7 @@ const PROVIDER_GRID: Provider[] = [
   { slug: "env-setup", name: "MiMo V2.5", tag: "Xiaomi · default" },
   { slug: "env-setup", name: "DeepSeek", tag: "V3.2" },
   { slug: "kimi", name: "Kimi", tag: "Moonshot K2" },
-  { slug: "minimax", name: "MiniMax", tag: "M2" },
+  { slug: "minimax", name: "MiniMax", tag: "M3" },
   { slug: "sensenova", name: "SenseNova", tag: "Flash-Lite" },
 ];
 

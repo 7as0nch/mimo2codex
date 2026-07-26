@@ -11,6 +11,14 @@ describe("PROVIDER_PRESETS", () => {
     expect(ids).toEqual(["kimi", "minimax", "sensenova"]);
   });
 
+  it("minimax preset uses M3 and the global docs host", () => {
+    const mm = PROVIDER_PRESETS.find((p) => p.id === "minimax");
+    expect(mm).toBeDefined();
+    expect(mm!.recommendedSpec.defaultModel).toBe("MiniMax-M3");
+    expect(mm!.recommendedSpec.baseUrl).toBe("https://api.minimax.io/v1");
+    expect(mm!.recommendedSpec.docsUrl).toBe("https://platform.minimax.io/docs");
+  });
+
   it("kimi preset has dropReasoningEffort + moonshot baseUrl", () => {
     const k = PROVIDER_PRESETS.find((p) => p.id === "kimi");
     expect(k).toBeDefined();
@@ -48,11 +56,13 @@ describe("matchPreset", () => {
     expect(matchPreset("", "deepseek-v4-flash")?.id).toBe("sensenova");
   });
 
-  it("matches minimax by baseUrl", () => {
+  it("matches minimax by global and CN baseUrl", () => {
+    expect(matchPreset("https://api.minimax.io/v1", "")?.id).toBe("minimax");
     expect(matchPreset("https://api.minimaxi.com/v1", "")?.id).toBe("minimax");
   });
 
   it("matches minimax by model prefix", () => {
+    expect(matchPreset("", "MiniMax-M3")?.id).toBe("minimax");
     expect(matchPreset("", "MiniMax-M2.7")?.id).toBe("minimax");
     expect(matchPreset("", "abab6.5")?.id).toBe("minimax");
   });
