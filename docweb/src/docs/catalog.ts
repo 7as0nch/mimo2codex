@@ -86,8 +86,8 @@ export const DOC_CATALOG: DocMeta[] = [
     group: "providers",
     title: { en: "MiniMax", zh: "接入 MiniMax" },
     summary: {
-      en: "Configure MiniMax M2 with its API quirks handled automatically.",
-      zh: "配置 MiniMax M2，API 兼容性细节自动处理。",
+      en: "Configure MiniMax M3 / M2.7 with the current context windows and both API hosts handled automatically.",
+      zh: "配置 MiniMax M3 / M2.7，并自动处理当前上下文长度与全球 / 中国 API 主机。",
     },
   },
   {

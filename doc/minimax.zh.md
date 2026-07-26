@@ -2,7 +2,7 @@
 
 > English: [minimax.md](./minimax.md)
 
-MiniMax (`https://api.minimaxi.com/v1`) 兼容 OpenAI Chat Completions 规范，但对请求字段的校验比 OpenAI 自家 / MiMo / DeepSeek 都更严格。直连 mimo2codex 的通用 generic provider 时会撞到几个非显然的报错。本文档说明如何用 v0.2.8+ 的 MiniMax 适配开关一键解决。
+MiniMax（`https://api.minimax.io/v1` / `https://api.minimaxi.com/v1`）兼容 OpenAI Chat Completions 规范，但对请求字段的校验比 OpenAI 自家 / MiMo / DeepSeek 都更严格。直连 mimo2codex 的通用 generic provider 时会撞到几个非显然的报错。本文档说明如何用 v0.2.8+ 的 MiniMax 适配开关一键解决。
 
 来源：[issue #7](https://github.com/7as0nch/mimo2codex/issues/7)
 
@@ -41,21 +41,21 @@ Codex 还会以请求里 `config.toml` 配置的 model 名（如 `gpt-5.5`）作
   "providers": [
     {
       "id": "minimax",
-      "displayName": "MiniMax M2.7",
-      "baseUrl": "https://api.minimaxi.com/v1",
+      "displayName": "MiniMax M3",
+      "baseUrl": "https://api.minimax.io/v1",
       "envKey": "MINIMAX_API_KEY",
-      "defaultModel": "MiniMax-M2.7",
+      "defaultModel": "MiniMax-M3",
       "models": [
-        { "id": "MiniMax-M2.7", "contextWindow": 245760 }
+        { "id": "MiniMax-M3", "contextWindow": 1000000 },
+        { "id": "MiniMax-M2.7", "contextWindow": 204800 }
       ],
-      "features": {
-        "minimaxCompat": true,
-        "forceParallelToolCalls": true
-      }
+      "features": { "minimaxCompat": true, "forceParallelToolCalls": true }
     }
   ]
 }
 ```
+
+同一份配置也会匹配 `https://api.minimaxi.com/v1`。`MiniMax-M3` 是 1,000,000 token 默认档；如果还要用 204,800 token 的 `MiniMax-M2.7`，就保留它的模型项。
 
 设环境变量并启动：
 ```bash
@@ -70,14 +70,16 @@ mimo2codex --model minimax
 如果只想跑 MiniMax，不打算 providers.json：
 
 ```bash
-export GENERIC_BASE_URL=https://api.minimaxi.com/v1
+export GENERIC_BASE_URL=https://api.minimax.io/v1
 export GENERIC_API_KEY=<your_key>
-export GENERIC_DEFAULT_MODEL=MiniMax-M2.7
-export GENERIC_FORCE_DEFAULT_MODEL=1   # 关键：未知模型名（如 "gpt-5.5"）自动改写到 MiniMax-M2.7
+export GENERIC_DEFAULT_MODEL=MiniMax-M3
+export GENERIC_FORCE_DEFAULT_MODEL=1   # 关键：未知模型名（如 "gpt-5.5"）自动改写到 MiniMax-M3
 mimo2codex
 ```
 
 ⚠️ **env-var 模式无法传 `features.minimaxCompat`**——想用严格模式开关请改用 providers.json。
+
+如果你还要 204,800 token 的 `MiniMax-M2.7`，请改用 providers.json 并在其中声明该模型项。
 
 ## 字段说明
 

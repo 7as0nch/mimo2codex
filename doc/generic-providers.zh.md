@@ -277,12 +277,13 @@ MiniMax 拒绝若干 OpenAI / MiMo / DeepSeek 都接受的字段。开 `minimaxC
 ```json
 {
   "id": "minimax",
-  "displayName": "MiniMax M2.7",
-  "baseUrl": "https://api.minimaxi.com/v1",
+  "displayName": "MiniMax M3",
+  "baseUrl": "https://api.minimax.io/v1",
   "envKey": "MINIMAX_API_KEY",
-  "defaultModel": "MiniMax-M2.7",
+  "defaultModel": "MiniMax-M3",
   "models": [
-    { "id": "MiniMax-M2.7", "contextWindow": 245760 }
+    { "id": "MiniMax-M3", "contextWindow": 1000000 },
+    { "id": "MiniMax-M2.7", "contextWindow": 204800 }
   ],
   "features": {
     "minimaxCompat": true,
@@ -290,6 +291,8 @@ MiniMax 拒绝若干 OpenAI / MiMo / DeepSeek 都接受的字段。开 `minimaxC
   }
 }
 ```
+
+同一份预设也会匹配 `https://api.minimaxi.com/v1`。`MiniMax-M3` 是 1,000,000 token 默认档；如果还要 204,800 token 的 `MiniMax-M2.7`，就保留它的模型项。
 
 详见 [minimax.zh.md](./minimax.zh.md)（含 env-var 单实例写法 `GENERIC_FORCE_DEFAULT_MODEL=1`）。
 

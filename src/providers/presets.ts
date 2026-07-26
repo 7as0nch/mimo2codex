@@ -57,12 +57,12 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: "minimax",
     displayName: "MiniMax",
-    matchBaseUrl: ["minimaxi.com", "api.minimax.chat"],
+    matchBaseUrl: ["minimax.io", "minimaxi.com", "api.minimax.chat"],
     matchModelPrefix: ["minimax-", "abab"],
     recommendedSpec: {
-      baseUrl: "https://api.minimaxi.com/v1",
-      defaultModel: "MiniMax-M2",
-      docsUrl: "https://platform.minimaxi.com/document",
+      baseUrl: "https://api.minimax.io/v1",
+      defaultModel: "MiniMax-M3",
+      docsUrl: "https://platform.minimax.io/docs",
       features: {
         // 一键预设涵盖 dropNullStrict / dropNullContent / dropToolChoiceAuto /
         // mergeSystemMessages / extractThinkTags。
