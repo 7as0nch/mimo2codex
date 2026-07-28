@@ -293,6 +293,14 @@ export interface ReqToChatOpts {
   //
   // Omit / leave undefined → fall back to `req.model` (backward-compatible).
   upstreamModel?: string;
+  // Explicit image-input capability override from the active provider's
+  // declared model metadata. Generic OpenAI-compatible providers (e.g.
+  // MiniMax) declare `supportsImages` per model in providers.json; without
+  // this override reqToChat would fall back to the hardcoded MiMo-only
+  // `modelSupportsImages` check and strip images for any non-MiMo model id,
+  // even when the upstream actually accepts image input. Omit / leave
+  // undefined → fall back to `modelSupportsImages(effectiveModel)`.
+  supportsImages?: boolean;
 }
 
 // Returns one or more ChatTools (a `namespace` wrapper can expand to many),
@@ -909,7 +917,7 @@ export function reqToChat(req: ResponsesRequest, opts: ReqToChatOpts = {}): Chat
   const effectiveModel = opts.upstreamModel ?? req.model;
   const ctx = {
     model: effectiveModel,
-    supportsImages: modelSupportsImages(effectiveModel),
+    supportsImages: opts.supportsImages ?? modelSupportsImages(effectiveModel),
     imageDropDir: opts.imageDropDir,
   };
 
