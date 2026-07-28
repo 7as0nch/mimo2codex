@@ -550,3 +550,130 @@ describe("loadGenericProviders — providers.json forceDefaultModel + features.m
     }
   });
 });
+
+// input-capability: a generic provider whose declared model carries
+// `supportsImages: true` must forward image parts to the upstream instead of
+// letting reqToChat strip them via the MiMo-only hardcoded check.
+describe("createGenericProvider — supportsImages metadata (input-capability)", () => {
+  it("forwards image parts when the declared model sets supportsImages: true", () => {
+    const p = createGenericProvider({
+      id: "minimax",
+      displayName: "MiniMax",
+      baseUrl: "https://api.minimax.io/v1",
+      envKey: "MINIMAX_API_KEY",
+      defaultModel: "MiniMax-M3",
+      models: [{ id: "MiniMax-M3", supportsImages: true }],
+    });
+    const chat = p.preprocessResponses(
+      {
+        model: "MiniMax-M3",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [
+              { type: "input_text", text: "describe this" },
+              {
+                type: "input_image",
+                image_url: "data:image/png;base64,AAAA",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        runtime: { apiKey: "k", baseUrl: "u", flags: {} },
+        exposeReasoning: true,
+        upstreamModel: "MiniMax-M3",
+      },
+    );
+    const userMsg = chat.messages.find((m) => m.role === "user")!;
+    const parts = userMsg.content as Array<{ type: string; image_url?: unknown }>;
+    // Image survived (not stripped to a text placeholder).
+    expect(parts.some((p) => p.type === "image_url")).toBe(true);
+    expect(parts.find((p) => p.type === "image_url")?.image_url).toEqual({
+      url: "data:image/png;base64,AAAA",
+      detail: undefined,
+    });
+  });
+
+  it("strips image parts when the declared model omits supportsImages", () => {
+    const p = createGenericProvider({
+      id: "textonly",
+      displayName: "TextOnly",
+      baseUrl: "https://x.example/v1",
+      envKey: "TEXT_API_KEY",
+      defaultModel: "text-1",
+      models: [{ id: "text-1" }], // no supportsImages
+    });
+    const chat = p.preprocessResponses(
+      {
+        model: "text-1",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [
+              { type: "input_text", text: "look" },
+              {
+                type: "input_image",
+                image_url: "data:image/png;base64,AAAA",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        runtime: { apiKey: "k", baseUrl: "u", flags: {} },
+        exposeReasoning: true,
+        upstreamModel: "text-1",
+      },
+    );
+    const userMsg = chat.messages.find((m) => m.role === "user")!;
+    // partsToChatContent collapses text-only payloads to a string.
+    const raw = userMsg.content;
+    const parts = (typeof raw === "string" ? [{ type: "text", text: raw }] : raw) as Array<{ type: string; text?: string }>;
+    // No image_url part forwarded; the strip notice is appended instead.
+    expect(parts.some((p) => p.type === "image_url")).toBe(false);
+    expect(parts.some((p) => p.type === "text" && typeof p.text === "string" && /omitted/i.test(p.text))).toBe(true);
+  });
+
+  it("open-catalog provider (no declared models) falls back to hardcoded check", () => {
+    // No models[] → no metadata to consult → reqToChat keeps using
+    // modelSupportsImages(), which is false for non-MiMo ids.
+    const p = createGenericProvider({
+      id: "open",
+      displayName: "Open",
+      baseUrl: "https://x.example/v1",
+      envKey: "OPEN_API_KEY",
+      defaultModel: "any",
+    });
+    const chat = p.preprocessResponses(
+      {
+        model: "any",
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [
+              { type: "input_text", text: "look" },
+              {
+                type: "input_image",
+                image_url: "data:image/png;base64,AAAA",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        runtime: { apiKey: "k", baseUrl: "u", flags: {} },
+        exposeReasoning: true,
+        upstreamModel: "any",
+      },
+    );
+    const userMsg = chat.messages.find((m) => m.role === "user")!;
+    const raw = userMsg.content;
+    const parts = (typeof raw === "string" ? [{ type: "text", text: raw }] : raw) as Array<{ type: string }>;
+    expect(parts.some((p) => p.type === "image_url")).toBe(false);
+  });
+});

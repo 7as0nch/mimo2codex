@@ -126,6 +126,19 @@ export function createGenericProvider(spec: GenericProviderSpec): Provider {
   // 用户写在 providers.json 的原始 features。下面 augment 一次得到"运行时"用的版本。
   const features = augmentFeaturesWithPreset(spec.features ?? {});
 
+  // Look up the declared model's image-input capability for the upstream
+  // model id (post-alias). Returns undefined when the provider has no
+  // declared catalog (open-catalog / forceDefaultModel passthrough) or the
+  // id isn't a declared model — callers fall back to the hardcoded check.
+  function resolveSupportsImages(upstreamModel: string | undefined): boolean | undefined {
+    if (!hasDeclaredModels || !upstreamModel) return undefined;
+    for (const m of declaredModels) {
+      if (m.id === upstreamModel) return m.supportsImages;
+      if (m.aliases?.includes(upstreamModel)) return m.supportsImages;
+    }
+    return undefined;
+  }
+
   return {
     id: spec.id,
     shortcut: spec.shortcut ?? spec.id,
@@ -168,6 +181,12 @@ export function createGenericProvider(spec: GenericProviderSpec): Provider {
         disableThinking: ctx.disableThinking,
         forceHighEffort: ctx.forceHighEffort,
         upstreamModel: ctx.upstreamModel,
+        // Forward the declared model's image-input capability so generic
+        // providers with vision models (e.g. MiniMax-M3) actually keep
+        // image parts instead of being stripped by the MiMo-only hardcoded
+        // modelSupportsImages() check. Without this, `supportsImages` in
+        // providers.json was UI-only.
+        supportsImages: resolveSupportsImages(ctx.upstreamModel),
       });
       // Generic OpenAI-compat upstreams don't understand MiMo's `thinking` family —
       // strip it. 然后**自己**翻成 sensenova 等接受的 reasoning_effort:"none"，
