@@ -1,5 +1,8 @@
 # mimo2codex
 
+> [!IMPORTANT]
+> **This repository is no longer maintained.**
+
 <p align="center">
   <a href="./README.md"><strong>English</strong></a> ·
   <a href="./README.zh.md">简体中文</a> ·
