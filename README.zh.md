@@ -1,5 +1,8 @@
 # mimo2codex · 中文文档
 
+> [!IMPORTANT]
+> **本仓库已停止维护。**
+
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md"><strong>简体中文</strong></a> ·
